@@ -169,7 +169,8 @@ export function CameraRig() {
     dir.subVectors(camera.position, head);
     if (dir.length() > allowed + 0.05) camera.position.copy(head).addScaledVector(dir.normalize(), allowed);
     // 카메라가 가까워질수록 플레이어 머리 대신 진행 방향 앞쪽을 바라봄 (어깨 너머 시점)
-    const close = 1 - THREE.MathUtils.clamp((allowed - 1.2) / 3, 0, 1);
+    const flat = Math.hypot(camera.position.x - player.pos.x, camera.position.z - player.pos.z);
+    const close = 1 - THREE.MathUtils.clamp((flat - 1.2) / 3, 0, 1);
     look.set(
       player.pos.x - Math.sin(cam.yaw) * 5 * close,
       1.3 + 0.4 * close,
