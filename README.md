@@ -34,6 +34,18 @@ npm run build && REDIS_URL=redis://localhost:6379 npm start
 docker compose up --build   # Redis 포함, http://localhost:3001
 ```
 
+### 배포 (Render, 권장)
+
+저장소에 `render.yaml`(블루프린트)이 있어 클릭 몇 번이면 **웹 서버 + Redis** 가 함께 만들어집니다.
+
+1. [render.com](https://render.com) 가입 후 GitHub 계정 연결
+2. 대시보드 **New → Blueprint** → `ranchokim64/farmertown` 선택 → **Apply**
+3. (선택) `NEIS_API_KEY` 입력 → 몇 분 뒤 `https://farmertown-xxxx.onrender.com` 주소가 생깁니다
+
+- 지역은 한국과 가까운 싱가포르, 이후 이 브랜치에 푸시하면 자동 재배포됩니다.
+- **free 플랜**: 15분 동안 접속이 없으면 잠들어 첫 접속에 1분 가까이 걸리고, Redis 데이터가 재시작 시 사라질 수 있습니다. 테스트용으로는 충분하고, 실제 수업/행사 때는 대시보드에서 두 서비스를 유료 Starter 로 올리세요.
+- 다른 곳(사내 서버, NAS 등)에 올릴 때는 아래 `docker compose up --build` 하나로 됩니다.
+
 ### 환경 변수 (server)
 
 | 이름 | 기본값 | 설명 |
@@ -41,7 +53,7 @@ docker compose up --build   # Redis 포함, http://localhost:3001
 | `PORT` | `3001` | |
 | `REDIS_URL` | (없음) | 없으면 개발용 인메모리 Mock (재시작 시 초기화) |
 | `NEIS_API_KEY` | (없음) | [나이스 교육정보 개방 포털](https://open.neis.go.kr) 키. 없으면 샘플 모드(최대 5건), 호출 실패 시 예시 학교 목록 사용 |
-| `TRUST_PROXY` | `0` | nginx 등 리버스 프록시 뒤라면 `1` (실제 학생 IP 를 Rate Limit 에 사용) |
+| `TRUST_PROXY` | `0` | 리버스 프록시 뒤라면 홉 수(`1`) 또는 `true`(Render 등 PaaS, 맨 앞 IP 사용) — 실제 학생 IP 를 Rate Limit 에 사용 |
 | `RL_IP_PER_MIN` | `1200` | IP 당 분당 API 호출 수 |
 | `RL_SESSION_CREATE_PER_MIN` | `120` | IP 당 분당 세션 생성 수 |
 | `RL_SESSION_PER_MIN` | `60` | 세션 당 분당 API 호출 수 |

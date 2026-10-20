@@ -7,8 +7,9 @@ export const config = {
   redisUrl: process.env.REDIS_URL || '',
   // 나이스(NEIS) 교육정보 개방 포털 API 키. 없으면 샘플 모드(최대 5건) → 실패 시 예시 학교 목록.
   neisApiKey: process.env.NEIS_API_KEY || '',
-  // 리버스 프록시(nginx 등) 뒤에서 실행할 때 X-Forwarded-For 를 신뢰할 홉 수
-  trustProxy: int(process.env.TRUST_PROXY, 0),
+  // 리버스 프록시(nginx, Render 등) 뒤에서 실행할 때 X-Forwarded-For 를 신뢰할 홉 수.
+  // 'true' 면 맨 앞(실제 학생) IP 를 사용합니다. 점수 방어는 세션 단위 제한이 담당하므로 IP 제한 우회 위험은 낮음.
+  trustProxy: process.env.TRUST_PROXY === 'true' ? true : int(process.env.TRUST_PROXY, 0),
   // 클라이언트 빌드 결과물(정적 파일) 경로. 존재하면 함께 서빙합니다.
   staticDir: process.env.STATIC_DIR || new URL('../../client/dist', import.meta.url).pathname,
 

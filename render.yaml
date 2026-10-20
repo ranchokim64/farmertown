@@ -1,0 +1,28 @@
+# Render 블루프린트: Render 대시보드 → New → Blueprint → 이 저장소 선택 → Apply
+# 웹 서버(Docker) + Redis 호환 Key Value 를 한 번에 만듭니다. 리전은 한국과 가까운 싱가포르.
+services:
+  - type: web
+    name: farmertown
+    runtime: docker
+    plan: free # 수업에서 쓸 때는 starter 이상 권장 (free 는 15분 미사용 시 잠들어 첫 접속이 느림)
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: farmertown-redis
+          property: connectionString
+      - key: TRUST_PROXY
+        value: "true"
+      - key: NEIS_API_KEY # 나이스 교육정보 개방 포털 키 (선택). 배포 시 입력하거나 나중에 추가
+        sync: false
+
+  - type: keyvalue
+    name: farmertown-redis
+    plan: free # free 는 재시작 시 데이터가 사라질 수 있음. 실제 행사는 starter 권장
+    region: singapore
+    maxmemoryPolicy: noeviction # 랭킹 데이터가 메모리 부족으로 지워지지 않도록
+    ipAllowList: [] # 외부 접속 차단 (같은 Render 계정의 서비스만 접근)
