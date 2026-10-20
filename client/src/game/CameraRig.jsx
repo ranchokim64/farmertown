@@ -48,6 +48,7 @@ export function CameraRig() {
   const tmp = useMemo(() => new THREE.Vector3(), []);
   const head = useMemo(() => new THREE.Vector3(), []);
   const dir = useMemo(() => new THREE.Vector3(), []);
+  const high = useMemo(() => new THREE.Vector3(), []);
   const ray = useMemo(() => new THREE.Raycaster(), []);
   const reach = useRef(1); // 장애물 때문에 줄어든 카메라 거리 비율 (0~1)
 
@@ -132,19 +133,33 @@ export function CameraRig() {
     cam.yaw += getCameraTurn() * dt * 1.8;
     tmp.set(player.pos.x + Math.sin(cam.yaw) * cam.dist, cam.height, player.pos.z + Math.cos(cam.yaw) * cam.dist);
 
-    // 벽 충돌: 머리 → 카메라 방향으로 레이를 쏴서 건물/나무에 가리면 카메라를 앞으로 당김
+    // 벽 충돌: 머리 → 카메라 방향으로 레이를 쏴서 건물/나무에 가리면 카메라를 앞으로 당김.
+    // 막혔을 때는 위에서 내려다보는 자리도 시험해 더 멀리 보이는 쪽을 고릅니다.
     head.set(player.pos.x, 1.5, player.pos.z);
-    dir.subVectors(tmp, head);
-    const full = dir.length();
-    dir.divideScalar(full);
-    ray.set(head, dir);
-    ray.far = full;
-    const hit = ray.intersectObjects(getBlockers(), false)[0];
-    const want = hit ? Math.max(0.18, (hit.distance - 0.4) / full) : 1;
+    const free = (target) => {
+      dir.subVectors(target, head);
+      const full = dir.length();
+      dir.divideScalar(full);
+      ray.set(head, dir);
+      ray.far = full;
+      const hit = ray.intersectObjects(getBlockers(), false)[0];
+      return hit ? Math.max(0, hit.distance - 0.35) / full : 1;
+    };
+    let want = free(tmp);
+    if (want < 1) {
+      high.set(player.pos.x + Math.sin(cam.yaw) * cam.dist * 0.6, cam.height + 3.5, player.pos.z + Math.cos(cam.yaw) * cam.dist * 0.6);
+      const wantHigh = free(high);
+      if (wantHigh * high.distanceTo(head) > want * tmp.distanceTo(head)) {
+        tmp.copy(high);
+        want = wantHigh;
+      }
+    }
     if (want < reach.current) reach.current = want; // 가릴 때는 즉시
     else reach.current = THREE.MathUtils.damp(reach.current, want, 3, dt); // 풀릴 때는 부드럽게
-    const allowed = full * reach.current;
-    tmp.copy(head).addScaledVector(dir, allowed);
+    dir.subVectors(tmp, head);
+    const allowed = dir.length() * reach.current;
+    tmp.copy(head).addScaledVector(dir.normalize(), allowed);
+    player.hidden = allowed < 1.4; // 카메라가 아주 가까우면 캐릭터가 화면을 가리지 않게 숨김
 
     if (camera.position.distanceTo(tmp) > 25) camera.position.copy(tmp); // 이어하기/건너뛰기 직후 바로 안착
     else camera.position.lerp(tmp, 1 - Math.exp(-dt * 8));

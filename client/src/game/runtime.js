@@ -6,6 +6,7 @@ export const player = {
   pos: new THREE.Vector3(PLAYER_START.x, 0, PLAYER_START.z),
   heading: PLAYER_START.heading, // 캐릭터가 바라보는 방향 (0 = +z)
   speed: 0,
+  hidden: false, // 카메라가 너무 가까울 때 캐릭터 숨김
 };
 
 export const cam = {

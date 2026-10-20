@@ -90,6 +90,7 @@ export function Player() {
     if (ref.current) {
       ref.current.position.copy(player.pos);
       ref.current.rotation.y = player.heading;
+      ref.current.visible = !player.hidden;
     }
   });
 
