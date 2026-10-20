@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { api, ApiError } from './api.js';
 import { MAIN_QUESTS } from './game/data/quests.js';
 import { sfx } from './sfx.js';
+import { music } from './music.js';
 
 const STORAGE_KEY = 'farmertown:v1';
 
@@ -125,6 +126,7 @@ export const useGame = create((set, get) => ({
     const completed = [...progress.completed, questId];
     set((s) => ({ progress: { ...s.progress, completed }, pending: [...s.pending, questId] }));
     sfx.play(questId === 'final' ? 'clear' : 'quest');
+    music.duck(questId === 'final' ? 5 : 1.5);
     if (questId === 'final') {
       set({ celebrateAt: performance.now(), clearInfo: { timeMs: Date.now() - progress.startedAt } });
       setTimeout(() => set({ showClear: true }), 4500);

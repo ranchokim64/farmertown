@@ -5,6 +5,7 @@ const MUTE_KEY = 'farmertown:muted';
 
 let ctx = null;
 let master = null;
+let bus = null; // 효과음과 배경음악이 함께 지나가는 컴프레서
 let noiseBuf = null;
 let muted = (() => {
   try {
@@ -22,12 +23,19 @@ function ensure() {
   ctx = new AC();
   master = ctx.createGain();
   master.gain.value = muted ? 0 : 0.55;
-  const comp = ctx.createDynamicsCompressor(); // 여러 소리가 겹쳐도 귀가 아프지 않게
-  master.connect(comp).connect(ctx.destination);
+  bus = ctx.createDynamicsCompressor(); // 여러 소리가 겹쳐도 귀가 아프지 않게
+  bus.connect(ctx.destination);
+  master.connect(bus);
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const data = noiseBuf.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
   return ctx;
+}
+
+// 배경음악(music.js)이 같은 오디오 컨텍스트를 쓰도록 공유
+export function audioBus() {
+  if (!ensure()) return null;
+  return { ctx, out: bus, noise: noiseBuf };
 }
 
 // 첫 사용자 입력에서 오디오 잠금 해제

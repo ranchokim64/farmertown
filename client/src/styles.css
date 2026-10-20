@@ -146,6 +146,10 @@ kbd { display: inline-block; background: #fff; color: var(--ink); border-radius:
   .prompt { bottom: 190px; font-size: 16px; }
 }
 
-.mute-btn { position: absolute; top: 0; left: -56px; width: 46px; height: 46px; border-radius: 50%; border: 3px solid #fff;
-  background: rgba(255, 248, 231, 0.92); font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(107, 68, 40, 0.18); }
-@media (max-width: 640px) { .mute-btn { left: auto; right: 0; top: calc(100% + 8px); } }
+.sound-toggles { position: absolute; top: 0; left: -104px; display: flex; gap: 6px; }
+.sound-toggles button { width: 46px; height: 46px; border-radius: 50%; border: 3px solid #fff; background: rgba(255, 248, 231, 0.92);
+  font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(107, 68, 40, 0.18); }
+.sound-toggles button.off { opacity: 0.5; filter: grayscale(1); }
+.title-sound { position: fixed; top: 14px; right: 14px; z-index: 4; }
+.title-sound .sound-toggles { position: static; }
+@media (max-width: 640px) { .school-panel .sound-toggles { left: auto; right: 0; top: calc(100% + 8px); } }
