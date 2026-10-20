@@ -3,7 +3,8 @@ const int = (v, d) => (v === undefined || v === '' ? d : Number.parseInt(v, 10))
 
 export const config = {
   port: int(process.env.PORT, 3001),
-  // 비어 있으면 개발용 인메모리 Redis(ioredis-mock)를 사용합니다.
+  // 저장소: DATABASE_URL(Supabase/Postgres) 이 있으면 우선 사용, 없으면 REDIS_URL, 둘 다 없으면 개발용 인메모리.
+  databaseUrl: process.env.DATABASE_URL || '',
   redisUrl: process.env.REDIS_URL || '',
   // 나이스(NEIS) 교육정보 개방 포털 API 키. 없으면 샘플 모드(최대 5건) → 실패 시 예시 학교 목록.
   neisApiKey: process.env.NEIS_API_KEY || '',
@@ -32,3 +33,4 @@ export const config = {
 
 export const QUEST_IDS = ['soil', 'snail', 'scarecrow', 'tteok', 'smartfarm'];
 export const FINAL_QUEST_ID = 'final';
+export const ALL_QUESTS = [...QUEST_IDS, FINAL_QUEST_ID];

@@ -1,7 +1,9 @@
 {
   "name": "farmertown",
   "private": true,
+  "type": "module",
   "description": "가래떡 마을의 황금 들판 - 11월 11일 농업인의 날 초등학생용 3D 웹 게임",
+  "engines": { "node": "22.x" },
   "scripts": {
     "install:all": "npm --prefix server install && npm --prefix client install",
     "dev:server": "npm --prefix server run dev",
@@ -9,5 +11,11 @@
     "build": "npm --prefix client run build",
     "start": "npm --prefix server start",
     "test": "npm --prefix server test"
+  },
+  "dependencies": {
+    "express": "4.21.1",
+    "ioredis": "5.4.1",
+    "ioredis-mock": "8.9.0",
+    "postgres": "3.4.5"
   }
 }

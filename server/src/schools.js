@@ -44,19 +44,19 @@ async function searchNeis(q, apiKey) {
   }));
 }
 
-export async function searchSchools(redis, q, apiKey) {
+export async function searchSchools(store, q, apiKey) {
   const query = String(q ?? '').trim().slice(0, 20);
   if (query.length < 1) return { source: 'none', schools: [] };
 
   const cacheKey = `schoolq:${query}`;
-  const cached = await redis.get(cacheKey);
-  if (cached) return JSON.parse(cached);
+  const cached = await store.cacheGet(cacheKey);
+  if (cached) return cached;
 
   let result;
   try {
     result = { source: 'neis', schools: await searchNeis(query, apiKey) };
-    for (const s of result.schools) await redis.hset('school:names', s.code, s.name);
-    await redis.set(cacheKey, JSON.stringify(result), 'EX', 60 * 60 * 24);
+    await store.rememberSchools(result.schools); // 세션 생성 시 학교 이름 위조 방지용
+    await store.cacheSet(cacheKey, result, 60 * 60 * 24);
   } catch (err) {
     console.warn('[schools] NEIS 검색 실패, 예시 목록 사용:', err.message);
     result = { source: 'sample', schools: SAMPLE_SCHOOLS.filter((s) => s.name.includes(query)) };

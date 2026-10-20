@@ -12,7 +12,9 @@
 | 폴더 | 내용 |
 | --- | --- |
 | `client/` | React 18 + React Three Fiber(Three.js) + zustand. 타이틀/인트로/인게임/클리어 화면, 로우폴리 마을 전체를 코드로 생성 (외부 3D 에셋 없음) |
-| `server/` | Node.js(Express) + Redis(ioredis). 세션, 퀘스트 완료 → 학교 점수 합산, 랭킹, 학교 검색 프록시, 비속어 필터, Rate Limit |
+| `server/` | Node.js(Express). 세션, 퀘스트 완료 → 학교 점수 합산, 랭킹, 학교 검색 프록시, 비속어 필터, Rate Limit. 저장소는 Postgres(Supabase) 또는 Redis |
+| `api/` | Vercel 서버리스 함수 진입점 (`server/` 의 Express 앱을 그대로 사용) |
+| `supabase/` | Supabase(Postgres) 테이블·함수 마이그레이션 SQL |
 
 ## 빠르게 실행하기
 
@@ -34,26 +36,28 @@ npm run build && REDIS_URL=redis://localhost:6379 npm start
 docker compose up --build   # Redis 포함, http://localhost:3001
 ```
 
-### 배포 (Render, 권장)
+### 배포 (Vercel + Supabase)
 
-저장소에 `render.yaml`(블루프린트)이 있어 클릭 몇 번이면 **웹 서버 + Redis** 가 함께 만들어집니다.
+자세한 순서는 **[docs/DEPLOY.md](docs/DEPLOY.md)** 에 있습니다. 구조는 이렇습니다.
 
-1. [render.com](https://render.com) 가입 후 GitHub 계정 연결
-2. 대시보드 **New → Blueprint** → `ranchokim64/farmertown` 선택 → **Apply**
-3. (선택) `NEIS_API_KEY` 입력 → 몇 분 뒤 `https://farmertown-xxxx.onrender.com` 주소가 생깁니다
+```
+브라우저 ──▶ Vercel ─┬─ client/dist (정적 파일: 게임 화면)
+                     └─ api/index.js (서버리스 함수: Express 앱) ──▶ Supabase Postgres (커넥션 풀러)
+```
 
-- 지역은 한국과 가까운 싱가포르, 이후 이 브랜치에 푸시하면 자동 재배포됩니다.
-- **free 플랜**: 15분 동안 접속이 없으면 잠들어 첫 접속에 1분 가까이 걸리고, Redis 데이터가 재시작 시 사라질 수 있습니다. 테스트용으로는 충분하고, 실제 수업/행사 때는 대시보드에서 두 서비스를 유료 Starter 로 올리세요.
-- 다른 곳(사내 서버, NAS 등)에 올릴 때는 아래 `docker compose up --build` 하나로 됩니다.
+- DB 스키마/함수: `supabase/migrations/*.sql` (SQL Editor 에 붙여 넣고 Run)
+- 환경 변수: `DATABASE_URL` (필수, Supabase Transaction pooler 주소), `NEIS_API_KEY` (선택)
+- 다른 서버에 올릴 때는 `docker compose up --build` (Redis 사용)
 
 ### 환경 변수 (server)
 
 | 이름 | 기본값 | 설명 |
 | --- | --- | --- |
 | `PORT` | `3001` | |
-| `REDIS_URL` | (없음) | 없으면 개발용 인메모리 Mock (재시작 시 초기화) |
+| `DATABASE_URL` | (없음) | Postgres/Supabase 연결 문자열. 있으면 이 저장소를 사용 (Vercel 배포 시 필수) |
+| `REDIS_URL` | (없음) | `DATABASE_URL` 이 없을 때 사용하는 Redis. 둘 다 없으면 개발용 인메모리 Mock (재시작 시 초기화) |
 | `NEIS_API_KEY` | (없음) | [나이스 교육정보 개방 포털](https://open.neis.go.kr) 키. 없으면 샘플 모드(최대 5건), 호출 실패 시 예시 학교 목록 사용 |
-| `TRUST_PROXY` | `0` | 리버스 프록시 뒤라면 홉 수(`1`) 또는 `true`(Render 등 PaaS, 맨 앞 IP 사용) — 실제 학생 IP 를 Rate Limit 에 사용 |
+| `TRUST_PROXY` | `0` | 리버스 프록시 뒤라면 홉 수(`1`) 또는 `true`(PaaS, 맨 앞 IP 사용) — 실제 학생 IP 를 Rate Limit 에 사용. Vercel 함수는 자동으로 `true` |
 | `RL_IP_PER_MIN` | `1200` | IP 당 분당 API 호출 수 |
 | `RL_SESSION_CREATE_PER_MIN` | `120` | IP 당 분당 세션 생성 수 |
 | `RL_SESSION_PER_MIN` | `60` | 세션 당 분당 API 호출 수 |
@@ -102,7 +106,10 @@ docker compose up --build   # Redis 포함, http://localhost:3001
 | `POST` | `/api/session/:id/complete` | `{ questId }` 퀘스트 완료 → 학교 점수 합산. 중복은 0점, 최종은 5개 완료 후에만 |
 | `GET` | `/api/leaderboard?school=` | 학교 TOP 5, 스피드런 TOP 10, 내 학교 순위 |
 
-Redis 키: `sess:{id}`(hash), `sess:{id}:done`(set), `lb:schools`(zset), `lb:speed`(zset, 클리어 ms), `school:names`(hash), `rl:*`/`cd:*`(rate limit).
+저장소는 `server/src/stores/` 의 같은 인터페이스를 따르는 두 구현이 있습니다.
+
+- **Postgres (Supabase)**: `ft_sessions`, `ft_session_quests`(중복 완료 방지 PK), `ft_schools`(학교 점수), `ft_rate_limits`, `ft_cache`. 점수 합산·쿨타임·Rate Limit 은 SQL 함수(`ft_complete_quest`, `ft_cooldown`, `ft_rate_hit`)로 원자적으로 처리. 모든 테이블 RLS 켬 + 공개 역할 권한 제거 → anon 키로는 접근 불가.
+- **Redis**: `sess:{id}`(hash), `sess:{id}:done`(set), `lb:schools`(zset), `lb:speed`(zset), `school:names`(hash), `rl:*`/`cd:*`.
 
 ### 보안 · 예외 처리
 
@@ -113,7 +120,8 @@ Redis 키: `sess:{id}`(hash), `sess:{id}:done`(set), `lb:schools`(zset), `lb:spe
 
 ## 개발 메모
 
-- `server`: `npm test` (node:test, ioredis-mock 사용)
+- `server`: `npm test` (node:test, 인메모리 저장소). `TEST_DATABASE_URL=postgres://...` 를 주면 Postgres 저장소로도 같은 테스트를 실행합니다.
+- 루트 `package.json` 의 dependencies 는 Vercel 함수 번들용입니다 (`server/package.json` 과 같은 목록을 유지하세요).
 - 클라이언트 디버그 핸들: `?debug` 로 접속하면 `window.__ft` 노출 (점수는 서버가 검증하므로 영향 없음)
 - 마을 배치는 `client/src/game/data/world.js`, 퀘스트 로직/대사는 `client/src/game/data/quests.js` 에 모여 있습니다.
 - 모든 3D 모델은 Three.js 기본 도형으로 만든 로우폴리이며, 한글 간판은 캔버스 텍스처로 그려 외부 폰트 CDN 없이도 보입니다 (UI 폰트는 Google Fonts `Jua`, 없으면 시스템 폰트).

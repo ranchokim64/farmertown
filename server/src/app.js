@@ -1,62 +1,52 @@
 import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
-import { config as defaultConfig, QUEST_IDS, FINAL_QUEST_ID } from './config.js';
+import { config as defaultConfig, QUEST_IDS, FINAL_QUEST_ID, ALL_QUESTS } from './config.js';
 import { validateNickname, containsProfanity } from './profanity.js';
-import { fixedWindow, cooldown, tooMany, ipLimiter } from './rateLimit.js';
+import { tooMany, ipLimiter } from './rateLimit.js';
 import { searchSchools, validSchoolCode, customSchoolCode, SAMPLE_SCHOOLS } from './schools.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ALL_QUESTS = [...QUEST_IDS, FINAL_QUEST_ID];
 
-// Redis 키
-const K = {
-  sess: (id) => `sess:${id}`,
-  done: (id) => `sess:${id}:done`,
-  schoolNames: 'school:names',
-  lbSchools: 'lb:schools',
-  lbSpeed: 'lb:speed',
-};
-
-export function createApp({ redis, config = defaultConfig }) {
+// store: stores/redisStore.js 또는 stores/postgresStore.js
+export function createApp({ store, config = defaultConfig }) {
   const app = express();
   app.set('trust proxy', config.trustProxy);
   app.disable('x-powered-by');
   app.use(express.json({ limit: '4kb' }));
 
   const api = express.Router();
-  api.use(ipLimiter(redis, { limit: config.rateLimit.ipPerMinute }));
+  api.use(ipLimiter(store, { limit: config.rateLimit.ipPerMinute }));
 
   const asyncRoute = (fn) => (req, res, next) => fn(req, res, next).catch(next);
 
   async function loadSession(id) {
     if (!UUID_RE.test(id ?? '')) return null;
-    const s = await redis.hgetall(K.sess(id));
-    if (!s || !s.nickname) return null;
-    const completed = await redis.smembers(K.done(id));
+    const s = await store.getSession(id);
+    if (!s) return null;
     return {
       sessionId: id,
       nickname: s.nickname,
       school: { code: s.schoolCode, name: s.schoolName },
-      startedAt: Number(s.startedAt),
-      score: Number(s.score || 0),
-      clearTimeMs: s.clearTimeMs ? Number(s.clearTimeMs) : null,
-      completed: ALL_QUESTS.filter((q) => completed.includes(q)),
+      startedAt: s.startedAt,
+      score: s.score,
+      clearTimeMs: s.clearTimeMs,
+      completed: ALL_QUESTS.filter((q) => s.completed.includes(q)),
     };
   }
 
   // 세션 단위 호출 제한 (새로고침 연타/매크로 방지)
   const sessionLimiter = asyncRoute(async (req, res, next) => {
-    const r = await fixedWindow(redis, `sess:${req.params.id}`, config.rateLimit.sessionPerMinute, 60_000);
+    const r = await store.rateHit(`sess:${req.params.id}`, config.rateLimit.sessionPerMinute, 60_000);
     if (!r.allowed) return tooMany(res, r.retryAfterMs);
     next();
   });
 
-  api.get('/health', (_req, res) => res.json({ ok: true }));
+  api.get('/health', (_req, res) => res.json({ ok: true, store: store.kind }));
 
   // ── 학교 검색 (자동완성) ─────────────────────────────
   api.get('/schools', asyncRoute(async (req, res) => {
-    res.json(await searchSchools(redis, req.query.q, config.neisApiKey));
+    res.json(await searchSchools(store, req.query.q, config.neisApiKey));
   }));
 
   // ── 세션 생성 / 갱신 ────────────────────────────────
@@ -68,7 +58,7 @@ export function createApp({ redis, config = defaultConfig }) {
     const existing = await loadSession(sessionId);
     if (existing) return res.json(existing); // 세션 복구: 학교/닉네임은 처음 값 유지
 
-    const rl = await fixedWindow(redis, `create:${req.ip}`, config.rateLimit.sessionCreatePerIpPerMinute, 60_000);
+    const rl = await store.rateHit(`create:${req.ip}`, config.rateLimit.sessionCreatePerIpPerMinute, 60_000);
     if (!rl.allowed) return tooMany(res, rl.retryAfterMs);
 
     const nick = validateNickname(rawNick);
@@ -83,21 +73,9 @@ export function createApp({ redis, config = defaultConfig }) {
     if (!validSchoolCode(schoolCode)) return res.status(400).json({ error: 'BAD_SCHOOL', message: '학교 정보를 다시 선택해 주세요.' });
 
     // NEIS/예시 학교는 서버가 알고 있는 이름으로 고정 (이름 위조 방지)
-    const known = (await redis.hget(K.schoolNames, schoolCode)) ?? SAMPLE_SCHOOLS.find((s) => s.code === schoolCode)?.name;
+    const known = (await store.knownSchoolName(schoolCode)) ?? SAMPLE_SCHOOLS.find((s) => s.code === schoolCode)?.name;
     const finalSchoolName = schoolCode.startsWith('custom:') ? schoolName : known ?? schoolName;
-    await redis.hsetnx(K.schoolNames, schoolCode, finalSchoolName);
-
-    await redis
-      .multi()
-      .hset(K.sess(sessionId), {
-        nickname: nick.nickname,
-        schoolCode,
-        schoolName: finalSchoolName,
-        startedAt: Date.now(),
-        score: 0,
-      })
-      .expire(K.sess(sessionId), config.sessionTtlSec)
-      .exec();
+    await store.createSession(sessionId, { nickname: nick.nickname, schoolCode, schoolName: finalSchoolName });
 
     res.status(201).json(await loadSession(sessionId));
   }));
@@ -128,56 +106,38 @@ export function createApp({ redis, config = defaultConfig }) {
     if (now - s.startedAt < nth * config.rateLimit.minMsPerQuest) {
       return tooMany(res, nth * config.rateLimit.minMsPerQuest - (now - s.startedAt), '너무 빨라요! 마을을 조금 더 둘러보세요.');
     }
-    const cd = await cooldown(redis, `quest:${id}`, config.rateLimit.questCooldownMs);
+    const cd = await store.cooldown(`quest:${id}`, config.rateLimit.questCooldownMs);
     if (!cd.allowed) return tooMany(res, cd.retryAfterMs);
 
-    // SADD 결과로 중복 완료(동시 요청)를 원자적으로 걸러냅니다.
-    const added = await redis.sadd(K.done(id), questId);
-    if (!added) return res.json({ ...(await loadSession(id)), added: 0 });
-
-    const points = questId === FINAL_QUEST_ID ? config.points.final : config.points.quest;
-    const tx = redis
-      .multi()
-      .hincrby(K.sess(id), 'score', points)
-      .zincrby(K.lbSchools, points, s.school.code)
-      .expire(K.done(id), config.sessionTtlSec);
-    let clearTimeMs = null;
-    if (questId === FINAL_QUEST_ID) {
-      clearTimeMs = now - s.startedAt;
-      tx.hset(K.sess(id), 'clearTimeMs', clearTimeMs).persist(K.sess(id)).persist(K.done(id));
-      tx.zadd(K.lbSpeed, clearTimeMs, id);
-    }
-    await tx.exec();
-
-    const result = { ...(await loadSession(id)), added: points };
-    if (clearTimeMs !== null) {
-      result.speedRank = (await redis.zrank(K.lbSpeed, id)) + 1;
-    }
+    // 저장소가 원자적으로 중복 완료(동시 요청)를 걸러내고 학교 점수를 합산합니다.
+    const isFinal = questId === FINAL_QUEST_ID;
+    const points = isFinal ? config.points.final : config.points.quest;
+    const r = await store.completeQuest(id, questId, points, isFinal);
+    const result = { ...(await loadSession(id)), added: r.added ? points : 0 };
+    if (r.added && isFinal) result.speedRank = await store.speedRank(id);
     res.json(result);
   }));
 
   // ── 랭킹 ────────────────────────────────────────────
+  // 모든 학생이 10초마다 불러오므로 인스턴스별로 3초 동안 캐시
+  let boardCache = { at: 0, limit: 0, data: null };
   api.get('/leaderboard', asyncRoute(async (req, res) => {
     const limit = Math.min(Number(req.query.limit) || 5, 20);
-    const raw = await redis.zrevrange(K.lbSchools, 0, limit - 1, 'WITHSCORES');
-    const codes = raw.filter((_, i) => i % 2 === 0);
-    const names = codes.length ? await redis.hmget(K.schoolNames, ...codes) : [];
-    const schools = codes.map((code, i) => ({ rank: i + 1, code, name: names[i] ?? code, score: Number(raw[i * 2 + 1]) }));
-
-    const speedRaw = await redis.zrange(K.lbSpeed, 0, 9, 'WITHSCORES');
-    const speedrun = [];
-    for (let i = 0; i < speedRaw.length; i += 2) {
-      const [nickname, schoolName] = await redis.hmget(K.sess(speedRaw[i]), 'nickname', 'schoolName');
-      speedrun.push({ rank: i / 2 + 1, nickname, schoolName, timeMs: Number(speedRaw[i + 1]) });
+    if (Date.now() - boardCache.at > 3000 || boardCache.limit !== limit) {
+      const [schools, speedrun] = await Promise.all([store.topSchools(limit), store.topSpeedrun(10)]);
+      boardCache = {
+        at: Date.now(),
+        limit,
+        data: {
+          schools: schools.map((s, i) => ({ rank: i + 1, ...s })),
+          speedrun: speedrun.map((s, i) => ({ rank: i + 1, ...s })),
+        },
+      };
     }
-
     let mySchool = null;
     const code = String(req.query.school ?? '');
-    if (validSchoolCode(code)) {
-      const [rank, score] = await Promise.all([redis.zrevrank(K.lbSchools, code), redis.zscore(K.lbSchools, code)]);
-      mySchool = { code, rank: rank === null ? null : rank + 1, score: Number(score ?? 0) };
-    }
-    res.json({ schools, speedrun, mySchool, updatedAt: Date.now() });
+    if (validSchoolCode(code)) mySchool = { code, ...(await store.schoolStanding(code)) };
+    res.json({ ...boardCache.data, mySchool, updatedAt: boardCache.at });
   }));
 
   api.use((_req, res) => res.status(404).json({ error: 'NOT_FOUND' }));
