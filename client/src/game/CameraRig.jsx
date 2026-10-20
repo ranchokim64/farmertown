@@ -149,7 +149,9 @@ export function CameraRig() {
     if (want < 1) {
       high.set(player.pos.x + Math.sin(cam.yaw) * cam.dist * 0.6, cam.height + 3.5, player.pos.z + Math.cos(cam.yaw) * cam.dist * 0.6);
       const wantHigh = free(high);
-      if (wantHigh * high.distanceTo(head) > want * tmp.distanceTo(head)) {
+      const highLen = wantHigh * high.distanceTo(head);
+      // 위쪽 시점은 충분히 멀리 볼 수 있을 때만 (머리 바로 위에서 모자만 보이는 상황 방지)
+      if (highLen > 3.5 && highLen > want * tmp.distanceTo(head) + 1) {
         tmp.copy(high);
         want = wantHigh;
       }
@@ -159,14 +161,21 @@ export function CameraRig() {
     dir.subVectors(tmp, head);
     const allowed = dir.length() * reach.current;
     tmp.copy(head).addScaledVector(dir.normalize(), allowed);
-    player.hidden = allowed < 1.4; // 카메라가 아주 가까우면 캐릭터가 화면을 가리지 않게 숨김
+    player.hidden = allowed < 1.8; // 카메라가 아주 가까우면 캐릭터가 화면을 가리지 않게 숨김
 
     if (camera.position.distanceTo(tmp) > 25) camera.position.copy(tmp); // 이어하기/건너뛰기 직후 바로 안착
     else camera.position.lerp(tmp, 1 - Math.exp(-dt * 8));
     // 따라가는 중에도 벽 너머로 빠지지 않도록 거리 제한
     dir.subVectors(camera.position, head);
     if (dir.length() > allowed + 0.05) camera.position.copy(head).addScaledVector(dir.normalize(), allowed);
-    camera.lookAt(player.pos.x, 1.3, player.pos.z);
+    // 카메라가 가까워질수록 플레이어 머리 대신 진행 방향 앞쪽을 바라봄 (어깨 너머 시점)
+    const close = 1 - THREE.MathUtils.clamp((allowed - 1.2) / 3, 0, 1);
+    look.set(
+      player.pos.x - Math.sin(cam.yaw) * 5 * close,
+      1.3 + 0.4 * close,
+      player.pos.z - Math.cos(cam.yaw) * 5 * close,
+    );
+    camera.lookAt(look);
   });
 
   return null;
