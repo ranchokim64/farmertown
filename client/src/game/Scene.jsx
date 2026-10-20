@@ -13,6 +13,7 @@ import { CameraRig } from './CameraRig.jsx';
 import { InteractionSystem } from './Interaction.jsx';
 import { Pickups } from './Pickups.jsx';
 import { Fireworks } from './effects/Fireworks.jsx';
+import { CamBlock } from './CamBlock.jsx';
 
 // 태양광: 그림자 범위를 줄이기 위해 플레이어(또는 카메라 시선)를 따라다닙니다.
 function SunLight() {
@@ -78,21 +79,30 @@ export function Scene() {
       {WEEDY_PADDIES.map((w) => (
         <Weeds key={w.id} x={w.x} z={w.z} cleared={!!flags[w.id]} />
       ))}
-      <Trees />
+      <CamBlock>
+        <Trees />
+      </CamBlock>
       <HayBales />
 
-      <Fountain />
+      <CamBlock>
+        <Fountain />
+      </CamBlock>
       <Tablet solved={completed.includes('soil')} />
-      <DangsanTree ribbons={completed.includes('final') ? 5 : ribbons} glowing={completed.includes('final')} />
+      <CamBlock>
+        <DangsanTree ribbons={completed.includes('final') ? 5 : ribbons} glowing={completed.includes('final')} />
+      </CamBlock>
       {ribbons === 5 && !completed.includes('final') && <QuestMark position={[PLACES.dangsan[0], 12.5, PLACES.dangsan[2]]} text="🎀" />}
-      <Scoreboard leaderboard={leaderboard} mySchoolCode={schoolCode} />
-      <Gate />
-      <Houses />
+      {/* 카메라가 뚫고 들어가지 않도록 등록하는 건물/구조물 (온실 유리는 투명이라 제외) */}
+      <CamBlock>
+        <Scoreboard leaderboard={leaderboard} mySchoolCode={schoolCode} />
+        <Gate />
+        <Houses />
+        <Mill />
+        <Market flags={flags} />
+        <Shed />
+      </CamBlock>
       <Clothesline />
-      <Mill />
-      <Market flags={flags} />
       <Greenhouse fixed={completed.includes('smartfarm')} />
-      <Shed />
       <FieldLife flags={flags} completed={completed} />
 
       <Sparrow position={PLACES.sparrowGuide} rotation={[0, 0.8, 0]} color="#c98a4b" />

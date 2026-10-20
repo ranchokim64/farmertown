@@ -145,3 +145,7 @@ kbd { display: inline-block; background: #fff; color: var(--ink); border-radius:
   .dialog p { font-size: 17px; }
   .prompt { bottom: 190px; font-size: 16px; }
 }
+
+.mute-btn { position: absolute; top: 0; left: -56px; width: 46px; height: 46px; border-radius: 50%; border: 3px solid #fff;
+  background: rgba(255, 248, 231, 0.92); font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(107, 68, 40, 0.18); }
+@media (max-width: 640px) { .mute-btn { left: auto; right: 0; top: calc(100% + 8px); } }

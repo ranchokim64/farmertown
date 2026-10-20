@@ -3,6 +3,7 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGame } from '../../store.js';
 import { PLACES } from '../data/world.js';
+import { sfx } from '../../sfx.js';
 
 const BURSTS = 10;
 const PARTICLES = 90;
@@ -39,6 +40,7 @@ export function Fireworks() {
       timer.current = 0.35 + Math.random() * 0.35;
       const b = bursts.find((x) => x.age > 2.2);
       if (b) {
+        sfx.play('firework');
         b.age = 0;
         b.origin.set(PLACES.dangsan[0] + (Math.random() - 0.3) * 30, 18 + Math.random() * 12, PLACES.dangsan[2] + (Math.random() - 0.5) * 20);
         b.material.color.set(COLORS[Math.floor(Math.random() * COLORS.length)]);

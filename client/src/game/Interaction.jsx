@@ -6,6 +6,7 @@ import { INTERACTABLES } from './data/quests.js';
 import { player } from './runtime.js';
 import { onInteract } from './input.js';
 import { mat } from './materials.js';
+import { sfx } from '../sfx.js';
 
 function nearest(p, filter, maxDist) {
   let best = null;
@@ -36,6 +37,8 @@ export function interactNow() {
     setFlag: s.setFlag,
     complete: s.complete,
     say: s.say,
+    hint: (speaker, lines) => s.say(speaker, lines, 'hint'),
+    sfx: sfx.play,
     toast: s.toast,
   });
 }

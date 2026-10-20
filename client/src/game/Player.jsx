@@ -6,6 +6,7 @@ import { player, cam } from './runtime.js';
 import { getMoveInput } from './input.js';
 import { COLLIDERS, WORLD_BOUNDS } from './data/world.js';
 import { Villager } from './models/Characters.jsx';
+import { sfx } from '../sfx.js';
 
 const RADIUS = 0.45;
 const WALK = 6;
@@ -51,6 +52,7 @@ function resolveCollisions(p) {
 
 export function Player() {
   const ref = useRef();
+  const stride = useRef(0);
   const outfit = useGame((s) => s.profile?.outfit);
 
   useFrame((_, rawDt) => {
@@ -76,6 +78,12 @@ export function Player() {
         player.heading += diff * Math.min(1, dt * 12);
         player.speed = THREE.MathUtils.damp(player.speed, speed, 10, dt);
         moving = true;
+        // 발소리: 광장(돌바닥)과 그 밖(흙/풀)을 구분
+        stride.current += speed * dt;
+        if (stride.current > 1.5) {
+          stride.current = 0;
+          sfx.play(Math.hypot(player.pos.x, player.pos.z) < 21 ? 'stepStone' : 'stepGrass');
+        }
       }
     }
     if (!moving) player.speed = THREE.MathUtils.damp(player.speed, 0, 10, dt);

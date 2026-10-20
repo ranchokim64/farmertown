@@ -4,6 +4,8 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useGame } from '../store.js';
 import { player, cam } from './runtime.js';
 import { getCameraTurn } from './input.js';
+import { getBlockers } from './CamBlock.jsx';
+import { sfx } from '../sfx.js';
 
 export const introCtl = { skip: false, progress: 0, forceT: null };
 const INTRO_SECONDS = 11;
@@ -44,6 +46,10 @@ export function CameraRig() {
   const t = useRef(0);
   const look = useMemo(() => new THREE.Vector3(), []);
   const tmp = useMemo(() => new THREE.Vector3(), []);
+  const head = useMemo(() => new THREE.Vector3(), []);
+  const dir = useMemo(() => new THREE.Vector3(), []);
+  const ray = useMemo(() => new THREE.Raycaster(), []);
+  const reach = useRef(1); // 장애물 때문에 줄어든 카메라 거리 비율 (0~1)
 
   const [curve, lookCurve] = useMemo(() => {
     const end = new THREE.Vector3(player.pos.x + Math.sin(cam.yaw) * cam.dist, cam.height, player.pos.z + Math.cos(cam.yaw) * cam.dist);
@@ -57,6 +63,8 @@ export function CameraRig() {
   useEffect(() => {
     t.current = 0;
     introCtl.skip = false;
+    introCtl.progress = 0;
+    if (phase === 'intro') sfx.play('whoosh');
   }, [phase]);
 
   // 마우스/터치 드래그로 시점 회전
@@ -88,6 +96,7 @@ export function CameraRig() {
   useFrame((state, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     t.current += dt;
+    if (window.__ft && !window.__ft.camera) window.__ft.camera = camera; // ?debug 전용
 
     if (phase === 'title') {
       // 타이틀: 황금 들판 위를 천천히 선회
@@ -98,7 +107,9 @@ export function CameraRig() {
     }
 
     if (phase === 'intro') {
+      const prevRaw = introCtl.progress;
       const raw = introCtl.forceT ?? Math.min(t.current / INTRO_SECONDS, 1);
+      if (prevRaw < 0.42 && raw >= 0.42) sfx.play('whoosh'); // 들판 저공비행 시작
       introCtl.progress = raw;
       const u = easeInOut(raw);
       curve.getPoint(u, camera.position);
@@ -120,8 +131,26 @@ export function CameraRig() {
     // 플레이: 3인칭 추적 카메라
     cam.yaw += getCameraTurn() * dt * 1.8;
     tmp.set(player.pos.x + Math.sin(cam.yaw) * cam.dist, cam.height, player.pos.z + Math.cos(cam.yaw) * cam.dist);
+
+    // 벽 충돌: 머리 → 카메라 방향으로 레이를 쏴서 건물/나무에 가리면 카메라를 앞으로 당김
+    head.set(player.pos.x, 1.5, player.pos.z);
+    dir.subVectors(tmp, head);
+    const full = dir.length();
+    dir.divideScalar(full);
+    ray.set(head, dir);
+    ray.far = full;
+    const hit = ray.intersectObjects(getBlockers(), false)[0];
+    const want = hit ? Math.max(0.18, (hit.distance - 0.4) / full) : 1;
+    if (want < reach.current) reach.current = want; // 가릴 때는 즉시
+    else reach.current = THREE.MathUtils.damp(reach.current, want, 3, dt); // 풀릴 때는 부드럽게
+    const allowed = full * reach.current;
+    tmp.copy(head).addScaledVector(dir, allowed);
+
     if (camera.position.distanceTo(tmp) > 25) camera.position.copy(tmp); // 이어하기/건너뛰기 직후 바로 안착
     else camera.position.lerp(tmp, 1 - Math.exp(-dt * 8));
+    // 따라가는 중에도 벽 너머로 빠지지 않도록 거리 제한
+    dir.subVectors(camera.position, head);
+    if (dir.length() > allowed + 0.05) camera.position.copy(head).addScaledVector(dir.normalize(), allowed);
     camera.lookAt(player.pos.x, 1.3, player.pos.z);
   });
 

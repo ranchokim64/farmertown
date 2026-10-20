@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGame, OUTFIT_COLORS } from '../store.js';
 import { api } from '../api.js';
 import { resetPlayer } from '../game/runtime.js';
+import { sfx } from '../sfx.js';
 
 const NICK_RE = /^[가-힣a-zA-Z0-9 ]{2,10}$/;
 
@@ -85,11 +86,12 @@ export function TitleScreen() {
   const join = async (e) => {
     e.preventDefault();
     setError('');
-    if (!school) return setError('학교를 검색해서 선택해 주세요.');
-    if (!NICK_RE.test(nickname.trim())) return setError('닉네임은 한글·영문·숫자 2~10자로 지어 주세요.');
+    if (!school) return sfx.play('hint'), setError('학교를 검색해서 선택해 주세요.');
+    if (!NICK_RE.test(nickname.trim())) return sfx.play('hint'), setError('닉네임은 한글·영문·숫자 2~10자로 지어 주세요.');
     setBusy(true);
     try {
       await startNew({ nickname: nickname.trim(), school, outfit });
+      sfx.play('start');
       resetPlayer();
       setPhase('intro');
     } catch (err) {
@@ -102,6 +104,7 @@ export function TitleScreen() {
   const continueGame = async () => {
     setBusy(true);
     await resume();
+    sfx.play('start');
     resetPlayer();
     setBusy(false);
     setPhase('play');
@@ -148,7 +151,7 @@ export function TitleScreen() {
                     aria-label={`작업복 색 ${c}`}
                     className={`swatch ${outfit.overall === c ? 'on' : ''}`}
                     style={{ background: c }}
-                    onClick={() => setOutfit({ ...outfit, overall: c })}
+                    onClick={() => (sfx.play('click'), setOutfit({ ...outfit, overall: c }))}
                   />
                 ))}
               </div>
@@ -161,7 +164,7 @@ export function TitleScreen() {
                     aria-label={`셔츠 색 ${c}`}
                     className={`swatch ${outfit.shirt === c ? 'on' : ''}`}
                     style={{ background: c }}
-                    onClick={() => setOutfit({ ...outfit, shirt: c })}
+                    onClick={() => (sfx.play('click'), setOutfit({ ...outfit, shirt: c }))}
                   />
                 ))}
               </div>

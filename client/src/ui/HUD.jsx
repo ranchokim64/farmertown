@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../store.js';
 import { QUESTS, ITEMS } from '../game/data/quests.js';
 import { joystick, fireInteract } from '../game/input.js';
+import { sfx } from '../sfx.js';
 
 function QuestLog() {
   const progress = useGame((s) => s.progress);
@@ -49,6 +50,7 @@ function SchoolPanel() {
   const my = lb?.mySchool;
   return (
     <div className="panel school-panel">
+      <MuteButton />
       <div className="nick">
         👩‍🌾 {profile?.nickname} <span className={`dot ${online ? 'on' : 'off'}`} title={online ? '서버 연결됨' : '오프라인 (진행은 저장돼요)'} />
       </div>
@@ -165,6 +167,24 @@ function Joystick() {
   );
 }
 
+function MuteButton() {
+  const [muted, setMuted] = useState(sfx.isMuted());
+  useEffect(() => {
+    const off = sfx.subscribe(setMuted);
+    const onKey = (e) => e.code === 'KeyM' && !e.repeat && sfx.setMuted(!sfx.isMuted());
+    window.addEventListener('keydown', onKey);
+    return () => {
+      off();
+      window.removeEventListener('keydown', onKey);
+    };
+  }, []);
+  return (
+    <button className="mute-btn" title="효과음 켜기/끄기 (M)" aria-label="효과음 켜기/끄기" onClick={() => sfx.setMuted(!muted)}>
+      {muted ? '🔇' : '🔊'}
+    </button>
+  );
+}
+
 const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 
 export function HUD() {
@@ -183,7 +203,7 @@ export function HUD() {
       <Dialog />
       {help && !isTouch && (
         <div className="help" onClick={() => setHelp(false)}>
-          <kbd>W A S D</kbd>/<kbd>방향키</kbd> 이동 · <kbd>Shift</kbd> 달리기 · <kbd>E</kbd> 줍기·대화 · 마우스 드래그(또는 <kbd>Q</kbd>/<kbd>R</kbd>) 시점 회전
+          <kbd>W A S D</kbd>/<kbd>방향키</kbd> 이동 · <kbd>Shift</kbd> 달리기 · <kbd>E</kbd> 줍기·대화 · 마우스 드래그(또는 <kbd>Q</kbd>/<kbd>R</kbd>) 시점 회전 · <kbd>M</kbd> 소리
           <br />
           머리 위 <b style={{ color: '#ffd34d' }}>노란 화살표</b>를 따라가 보세요!
         </div>

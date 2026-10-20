@@ -96,7 +96,8 @@ export const QUESTS = [
 
 // ── 상호작용 대상 ────────────────────────────────────
 // active(p): 현재 상호작용 가능 여부 / guide(p): 길안내 화살표 대상 여부
-// interact(ctx): ctx = { p, pick, take, setFlag, complete, say, toast }
+// interact(ctx): ctx = { p, pick, take, setFlag, complete, say, hint, sfx, toast }
+//   hint = 아직 조건이 안 됐을 때의 안내 대사 (say 와 같지만 다른 효과음)
 
 const pickupInteractables = PICKUPS.map((it) => ({
   id: it.id,
@@ -126,7 +127,7 @@ export const INTERACTABLES = [
       const pieces = ['hanja_sip_a', 'hanja_sip_b', 'hanja_il_a', 'hanja_il_b'];
       const have = pieces.filter((id) => has(ctx.p, id));
       if (have.length < 4) {
-        ctx.say('부서진 비석', [
+        ctx.hint('부서진 비석', [
           `비석에 홈이 4개 파여 있어요. 지금 조각은 ${have.length}개!`,
           '광장 곳곳에 반짝이는 十 조각 2개와 一 조각 2개를 찾아보세요.',
         ]);
@@ -179,10 +180,11 @@ export const INTERACTABLES = [
     label: (p) => (has(p, 'snail_basket') ? '우렁이 풀어주기 · 잡초 논' : '살펴보기 · 잡초 논'),
     interact: (ctx) => {
       if (!has(ctx.p, 'snail_basket')) {
-        ctx.say('잡초가 무성한 논', ['잡초가 벼보다 더 많아 보여요…', '들판 입구의 농부 아저씨께 이야기를 들어 보세요.']);
+        ctx.hint('잡초가 무성한 논', ['잡초가 벼보다 더 많아 보여요…', '들판 입구의 농부 아저씨께 이야기를 들어 보세요.']);
         return;
       }
       ctx.setFlag(w.id);
+      ctx.sfx('splash');
       const done = WEEDY_PADDIES.filter((x) => x.id === w.id || flag(ctx.p, x.id)).length;
       if (done === 3) {
         ctx.take(['snail_basket']);
@@ -205,7 +207,7 @@ export const INTERACTABLES = [
     interact: (ctx) => {
       const need = ['straw_hat', 'old_shirt'].filter((id) => !has(ctx.p, id));
       if (need.length) {
-        ctx.say('허수아비 뼈대', [
+        ctx.hint('허수아비 뼈대', [
           '짹짹! 참새들이 벼 이삭을 쪼아 먹고 있어요.',
           `허수아비에게 ${need.map((id) => ITEMS[id].name).join('와 ')}이(가) 필요해요.`,
           '밀짚모자는 장터에, 낡은 셔츠는 마을 빨랫줄에 있대요.',
@@ -246,11 +248,12 @@ export const INTERACTABLES = [
     label: () => `배달하기 · ${e.name}`,
     interact: (ctx) => {
       if (!has(ctx.p, e.want)) {
-        ctx.say(e.name, [`아이고, 배가 출출하구나. 나는 ${ITEMS[e.want].name}이 먹고 싶은데…`, '방앗간에 가면 있을 거란다.']);
+        ctx.hint(e.name, [`아이고, 배가 출출하구나. 나는 ${ITEMS[e.want].name}이 먹고 싶은데…`, '방앗간에 가면 있을 거란다.']);
         return;
       }
       ctx.take([e.want]);
       ctx.setFlag(e.id);
+      ctx.sfx('deliver');
       const done = ELDERS.filter((x) => x.id === e.id || flag(ctx.p, x.id)).length;
       if (done === 3) {
         ctx.complete('tteok');
@@ -271,7 +274,7 @@ export const INTERACTABLES = [
     label: () => '센서 장착하기 · 스마트팜 콘솔',
     interact: (ctx) => {
       if (!has(ctx.p, 'sensor')) {
-        ctx.say('스마트팜 콘솔', ['삐빅! [오류] 온·습도 센서를 찾을 수 없습니다.', '창고에 예비 센서가 있을지도 몰라요.']);
+        ctx.hint('스마트팜 콘솔', ['삐빅! [오류] 온·습도 센서를 찾을 수 없습니다.', '창고에 예비 센서가 있을지도 몰라요.']);
         return;
       }
       ctx.take(['sensor']);
@@ -295,7 +298,7 @@ export const INTERACTABLES = [
     interact: (ctx) => {
       const n = MAIN_QUESTS.filter((q) => ctx.p.completed.includes(q)).length;
       if (n < 5) {
-        ctx.say('마을 당산나무', [
+        ctx.hint('마을 당산나무', [
           '수백 년 동안 마을을 지켜 온 당산나무예요.',
           `감사 리본 5개를 모두 모아 오면 황금 들판 감사 트리를 완성할 수 있어요. (지금 ${n}/5)`,
         ]);

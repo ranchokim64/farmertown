@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api, ApiError } from './api.js';
 import { MAIN_QUESTS } from './game/data/quests.js';
+import { sfx } from './sfx.js';
 
 const STORAGE_KEY = 'farmertown:v1';
 
@@ -108,10 +109,12 @@ export const useGame = create((set, get) => ({
   },
 
   // ── 진행도 조작 ──
-  pick: (itemId) =>
+  pick: (itemId) => {
+    if (!get().progress.inventory.includes(itemId)) sfx.play('pickup');
     set((s) =>
       s.progress.inventory.includes(itemId) ? {} : { progress: { ...s.progress, inventory: [...s.progress.inventory, itemId] } },
-    ),
+    );
+  },
   take: (ids) =>
     set((s) => ({ progress: { ...s.progress, inventory: s.progress.inventory.filter((i) => !ids.includes(i)) } })),
   setFlag: (id) => set((s) => ({ progress: { ...s.progress, flags: { ...s.progress.flags, [id]: true } } })),
@@ -121,6 +124,7 @@ export const useGame = create((set, get) => ({
     if (progress.completed.includes(questId)) return;
     const completed = [...progress.completed, questId];
     set((s) => ({ progress: { ...s.progress, completed }, pending: [...s.pending, questId] }));
+    sfx.play(questId === 'final' ? 'clear' : 'quest');
     if (questId === 'final') {
       set({ celebrateAt: performance.now(), clearInfo: { timeMs: Date.now() - progress.startedAt } });
       setTimeout(() => set({ showClear: true }), 4500);
@@ -143,6 +147,7 @@ export const useGame = create((set, get) => ({
         try {
           const r = await api.complete(get().sessionId, questId);
           set((s) => ({ online: true, serverScore: r.score, pending: s.pending.slice(1) }));
+          if (r.added) sfx.play('coin');
           if (r.added) get().toast(`🏫 ${get().profile?.school?.name} +${r.added}점!`);
           if (r.clearTimeMs) set({ clearInfo: { timeMs: r.clearTimeMs, speedRank: r.speedRank } });
           get().refreshLeaderboard();
@@ -178,10 +183,14 @@ export const useGame = create((set, get) => ({
   },
 
   // ── UI ──
-  say: (speaker, lines) => set({ dialog: { speaker, lines, index: 0 } }),
+  say: (speaker, lines, sound = 'talk') => {
+    sfx.play(sound);
+    set({ dialog: { speaker, lines, index: 0 } });
+  },
   advanceDialog: () => {
     const d = get().dialog;
     if (!d) return;
+    sfx.play('blip');
     if (d.index + 1 < d.lines.length) set({ dialog: { ...d, index: d.index + 1 } });
     else set({ dialog: null });
   },
