@@ -1,0 +1,21 @@
+{
+  "name": "farmertown-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "가래떡 마을의 황금 들판 - 랭킹/세션 API 서버 (Node.js + Redis)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "ioredis": "^5.4.1",
+    "ioredis-mock": "^8.9.0"
+  }
+}

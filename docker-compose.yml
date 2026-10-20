@@ -1,0 +1,15 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redis-data:/data]
+  app:
+    build: .
+    ports: ["3001:3001"]
+    environment:
+      REDIS_URL: redis://redis:6379
+      NEIS_API_KEY: ${NEIS_API_KEY:-}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+    depends_on: [redis]
+volumes:
+  redis-data:
