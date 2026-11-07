@@ -4,6 +4,7 @@ import { music } from '../music.js';
 import { useQuality, QUALITY, isTouchDevice } from '../quality.js';
 import { canFullscreen, isFullscreen, toggleFullscreen } from '../fullscreen.js';
 import { useGame } from '../store.js';
+import { useQr } from './QrOverlay.jsx';
 
 // 화면 오른쪽 위 버튼들: 전체 화면(태블릿) / 화질 / 배경음악(B) / 효과음(M)
 export function SoundToggles() {
@@ -28,6 +29,9 @@ export function SoundToggles() {
   };
   return (
     <div className="sound-toggles">
+      <button title="입장 QR코드 크게 보기" aria-label="입장 QR코드 보기" className="qr-btn" onClick={useQr.getState().show}>
+        QR
+      </button>
       {isTouchDevice && canFullscreen && (
         <button title="전체 화면" aria-label="전체 화면 켜기/끄기" className={full ? '' : 'off'} onClick={toggleFullscreen}>
           ⛶

@@ -187,8 +187,8 @@ kbd { display: inline-block; background: #fff; color: var(--ink); border-radius:
 .quest-log li.locked > .q-title { color: #b8a58c; }
 
 /* ── 태블릿 ───────────────────────────── */
-/* 가로 1180px 이하(세로 태블릿, 작은 태블릿): 튜토리얼 배너를 위쪽 줄(미션 창·점수판) 아래, 미션 창 오른쪽으로 */
-@media (max-width: 1180px) and (min-width: 641px) {
+/* 가로 1440px 이하(갤럭시 탭 가로·세로, 노트북): 튜토리얼 배너를 위쪽 줄(미션 창·버튼·점수판) 아래, 미션 창 오른쪽으로 */
+@media (max-width: 1440px) and (min-width: 641px) {
   .quest-log { width: 270px; }
   .tutorial-banner { top: 150px; left: 298px; right: 12px; transform: none; width: auto; max-width: 440px; margin: 0 auto; }
   .hud.tutoring .toasts { top: 290px; left: calc(50% + 143px); }
@@ -216,6 +216,20 @@ kbd { display: inline-block; background: #fff; color: var(--ink); border-radius:
   .tb-icon { font-size: 26px; }
   .tb-dots { margin-top: 4px; }
 }
-@media (max-height: 700px) and (max-width: 1180px) and (min-width: 641px) {
+@media (max-height: 700px) and (max-width: 1440px) and (min-width: 641px) {
   .tutorial-banner { top: 130px; }
 }
+
+/* ── QR 입장 안내 ─────────────────────── */
+.qr-bg { position: fixed; inset: 0; z-index: 20; display: flex; overflow-y: auto; padding: 16px;
+  background: rgba(40, 25, 10, 0.55); touch-action: pan-y; }
+.qr-card { margin: auto; background: var(--cream); border: 6px solid #fff; border-radius: 32px; padding: 20px 28px 18px;
+  text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35); animation: qr-pop 0.3s ease-out; }
+/* QR 는 처음부터 또렷하게 (투명도 애니메이션 없이 살짝 커지기만) */
+@keyframes qr-pop { from { transform: scale(0.94); } to { transform: none; } }
+.qr-card .badge { font-size: clamp(18px, 2.6vw, 26px); padding: 8px 22px; }
+.qr-code { display: block; margin: 16px auto 10px; border-radius: 12px; box-shadow: 0 0 0 10px #fff, 0 0 0 16px #f6c445; max-width: 100%; height: auto !important; }
+.qr-url { font-size: clamp(18px, 2.4vw, 30px); color: var(--brown); word-break: break-all; }
+.qr-card p { margin: 6px 0 12px; font-size: 15px; }
+.sound-toggles button.qr-btn { font-size: 15px; font-weight: bold; color: var(--brown); }
+.btn.ghost.qr-open { margin-top: 6px; font-size: 14px; color: #3b7dd8; padding: 6px 10px; }

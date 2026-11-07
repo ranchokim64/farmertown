@@ -5,6 +5,7 @@ import { resetPlayer } from '../game/runtime.js';
 import { sfx } from '../sfx.js';
 import { enterFullscreen } from '../fullscreen.js';
 import { isTouchDevice } from '../quality.js';
+import { useQr } from './QrOverlay.jsx';
 
 const NICK_RE = /^[가-힣a-zA-Z0-9 ]{2,10}$/;
 
@@ -204,6 +205,9 @@ export function TitleScreen() {
           </form>
         )}
         <p className="hint">회원가입 없이 바로 즐겨요 · 바른 말 고운 말 닉네임을 써 주세요</p>
+        <button type="button" className="btn ghost qr-open" onClick={useQr.getState().show}>
+          📱 QR코드로 입장 안내 (선생님용)
+        </button>
         {portrait && <p className="portrait-tip">📱↻ 태블릿을 가로로 돌리면 마을을 더 넓게 볼 수 있어요</p>}
       </div>
     </div>
