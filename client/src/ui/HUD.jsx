@@ -3,13 +3,19 @@ import { useGame } from '../store.js';
 import { QUESTS, ITEMS } from '../game/data/quests.js';
 import { joystick, fireInteract } from '../game/input.js';
 import { SoundToggles } from './SoundToggles.jsx';
+import { TutorialBanner } from './TutorialBanner.jsx';
 
 function QuestLog() {
   const progress = useGame((s) => s.progress);
-  const [open, setOpen] = useState(true);
+  const tutorial = progress.tutorial ?? 'done';
+  // 튜토리얼 연습 중에는 접어 두었다가, 촌장님이 미션 창을 설명할 때 펼치고 반짝임
+  const [open, setOpen] = useState(tutorial === 'done');
+  useEffect(() => {
+    if (tutorial === 'mission' || tutorial === 'done') setOpen(true);
+  }, [tutorial]);
   const doneCount = QUESTS.filter((q) => progress.completed.includes(q.id)).length;
   return (
-    <div className="panel quest-log">
+    <div className={`panel quest-log ${tutorial === 'mission' ? 'spotlight' : ''}`}>
       <button className="panel-head" onClick={() => setOpen(!open)}>
         📜 축제 미션 <b>{doneCount}/6</b> <span className="muted">{open ? '▲' : '▼'}</span>
       </button>
@@ -170,24 +176,27 @@ function Joystick() {
 const isTouch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 
 export function HUD() {
-  const [help, setHelp] = useState(true);
+  const tutorial = useGame((s) => s.progress.tutorial ?? 'done');
+  // 조작법 요약: 튜토리얼을 건너뛴 경우에만 잠깐 보여 줌 (튜토리얼 중에는 안내 배너가 대신함)
+  const [help, setHelp] = useState(tutorial === 'done');
   useEffect(() => {
     const t = setTimeout(() => setHelp(false), 12000);
     return () => clearTimeout(t);
   }, []);
   return (
-    <div className="hud">
+    <div className={`hud ${tutorial !== 'done' ? 'tutoring' : ''}`}>
       <QuestLog />
       <SchoolPanel />
+      <TutorialBanner />
       <Toasts />
       <Prompt />
       <Inventory />
       <Dialog />
-      {help && !isTouch && (
+      {help && tutorial === 'done' && !isTouch && (
         <div className="help" onClick={() => setHelp(false)}>
           <kbd>W A S D</kbd>/<kbd>방향키</kbd> 이동 · <kbd>Shift</kbd> 달리기 · <kbd>E</kbd> 줍기·대화 · 마우스 드래그(또는 <kbd>Q</kbd>/<kbd>R</kbd>) 시점 회전 · <kbd>M</kbd> 효과음 · <kbd>B</kbd> 음악
           <br />
-          머리 위 <b style={{ color: '#ffd34d' }}>노란 화살표</b>를 따라가 보세요!
+          발밑의 <b style={{ color: '#ffd34d' }}>노란 화살표</b>를 따라가 보세요!
         </div>
       )}
       {isTouch && (

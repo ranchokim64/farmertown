@@ -153,3 +153,30 @@ kbd { display: inline-block; background: #fff; color: var(--ink); border-radius:
 .title-sound { position: fixed; top: 14px; right: 14px; z-index: 4; }
 .title-sound .sound-toggles { position: static; }
 @media (max-width: 640px) { .school-panel .sound-toggles { left: auto; right: 0; top: calc(100% + 8px); } }
+
+/* ── 튜토리얼 ────────────────────────── */
+.tutorial-banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: min(420px, calc(100vw - 24px));
+  background: rgba(255, 248, 231, 0.97); border: 4px solid #fff; border-radius: 22px; padding: 10px 16px 12px;
+  box-shadow: 0 10px 28px rgba(107, 68, 40, 0.25), 0 0 0 4px rgba(246, 196, 69, 0.55); animation: pop 0.35s ease-out; z-index: 2; }
+.tutorial-banner.passed { box-shadow: 0 10px 28px rgba(60, 179, 113, 0.3), 0 0 0 4px rgba(60, 179, 113, 0.7); }
+.tb-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.tb-step { background: var(--gold); color: #6b3d0a; border-radius: 999px; padding: 2px 10px; }
+.tb-skip { background: none; border: none; color: #9a7b5c; font-size: 13px; cursor: pointer; }
+.tb-body { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+.tb-body b { font-size: 20px; font-weight: normal; color: var(--gold-deep); }
+.tutorial-banner.passed .tb-body b { color: var(--green); font-size: 26px; }
+.tb-body p { margin: 2px 0 0; font-size: 16px; line-height: 1.45; word-break: keep-all; }
+.tb-icon { font-size: 34px; animation: hop 1.2s ease-in-out infinite; display: inline-block; }
+@keyframes hop { 50% { transform: translateY(-4px); } }
+.tb-meter { height: 10px; background: #f0dcb4; border-radius: 999px; margin-top: 8px; overflow: hidden; }
+.tb-meter div { height: 100%; background: linear-gradient(90deg, #ffd34d, #3cb371); border-radius: 999px; transition: width 0.15s; }
+.tb-dots { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+.tb-dots i { width: 9px; height: 9px; border-radius: 50%; background: #f0dcb4; }
+.tb-dots i.now { background: var(--gold); transform: scale(1.25); }
+.tb-dots i.on { background: var(--green); }
+.quest-log.spotlight { box-shadow: 0 0 0 4px #ffd34d, 0 0 30px 8px rgba(255, 211, 77, 0.8); animation: spot 1s ease-in-out infinite; z-index: 3; }
+@keyframes spot { 50% { box-shadow: 0 0 0 4px #ffd34d, 0 0 14px 3px rgba(255, 211, 77, 0.5); } }
+@media (max-width: 640px) {
+  .tutorial-banner { top: auto; bottom: 170px; }
+}
+.hud.tutoring .toasts { top: 175px; }

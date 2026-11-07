@@ -14,6 +14,7 @@ import { InteractionSystem } from './Interaction.jsx';
 import { Pickups } from './Pickups.jsx';
 import { Fireworks } from './effects/Fireworks.jsx';
 import { CamBlock } from './CamBlock.jsx';
+import { TutorialSystem, Chief } from './Tutorial.jsx';
 
 // 태양광: 그림자 범위를 줄이기 위해 플레이어(또는 카메라 시선)를 따라다닙니다.
 function SunLight() {
@@ -105,6 +106,8 @@ export function Scene() {
       <Greenhouse fixed={completed.includes('smartfarm')} />
       <FieldLife flags={flags} completed={completed} />
 
+      <Chief />
+      <TutorialSystem />
       <Sparrow position={PLACES.sparrowGuide} rotation={[0, 0.8, 0]} color="#c98a4b" />
       <Frog position={PLACES.frog} rotation={[0, Math.PI / 2, 0]} />
 

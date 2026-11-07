@@ -7,6 +7,7 @@ import { player } from './runtime.js';
 import { onInteract } from './input.js';
 import { mat } from './materials.js';
 import { sfx } from '../sfx.js';
+import { finishTutorial } from './Tutorial.jsx';
 
 function nearest(p, filter, maxDist) {
   let best = null;
@@ -32,6 +33,9 @@ export function interactNow() {
   if (!current) return;
   current.interact({
     p: s.progress,
+    nickname: s.profile?.nickname ?? '친구',
+    setTutorial: s.setTutorial,
+    finishTutorial,
     pick: s.pick,
     take: s.take,
     setFlag: s.setFlag,
@@ -41,6 +45,10 @@ export function interactNow() {
     sfx: sfx.play,
     toast: s.toast,
   });
+  // 튜토리얼 '말 걸기' 단계: 참새와의 대화를 끝까지 읽으면 통과
+  if (s.progress.tutorial === 'talk' && current.id === 'sparrowGuide') {
+    useGame.getState().onDialogClose(() => useGame.getState().passTutorialStep('talk', 'pickup'));
+  }
 }
 
 // 가까운 상호작용 대상을 찾아 [E] 안내를 띄우고, 길안내 화살표를 갱신합니다.
@@ -58,7 +66,13 @@ export function InteractionSystem() {
       const p = s.progress;
       const near = s.phase === 'play' ? nearest(p, (it) => it.active(p), 99) : null;
       s.setPrompt(near && !s.dialog ? near.it.label(p) : null);
-      guideTarget.current = nearest(p, (it) => it.guide(p), Infinity);
+      const step = p.tutorial ?? 'done';
+      const guideFilter =
+        step === 'done' ? (it) => it.guide(p)
+        : step === 'talk' ? (it) => it.id === 'sparrowGuide'
+        : step === 'pickup' ? (it) => it.id.startsWith('hanja_') && it.active(p)
+        : () => false; // 첫 인사/걷기/둘러보기/미션 설명 중에는 화살표 숨김
+      guideTarget.current = nearest(p, guideFilter, Infinity);
     }
     // 길안내 화살표
     const g = guideTarget.current;
@@ -66,9 +80,11 @@ export function InteractionSystem() {
     if (!a) return;
     a.visible = s.phase === 'play' && !!g && g.d > 4;
     if (a.visible) {
+      // 발밑 바닥에 눕힌 화살표: 위에서 내려다보는 카메라에서 잘 보이고, 목표 쪽으로 콩콩 움직임
       const dir = Math.atan2(g.it.pos[0] - player.pos.x, g.it.pos[2] - player.pos.z);
-      a.position.set(player.pos.x, 3.0 + Math.sin(state.clock.elapsedTime * 3) * 0.08, player.pos.z);
+      a.position.set(player.pos.x, 0.08, player.pos.z);
       a.rotation.y = dir;
+      a.children[0].position.z = 1.5 + Math.sin(state.clock.elapsedTime * 5) * 0.25;
     }
   });
 
@@ -85,13 +101,13 @@ export function InteractionSystem() {
     const g = new THREE.ExtrudeGeometry(shape, { depth: 0.15, bevelEnabled: false });
     g.translate(0, 0, -0.075);
     g.rotateX(Math.PI / 2); // 화살표 끝이 +z 를 향하도록 눕힘
-    g.scale(0.7, 0.7, 0.7);
+    g.scale(1.1, 1, 1.1);
     return g;
   }, []);
 
   return (
     <group ref={arrow} visible={false}>
-      <mesh geometry={arrowGeo} position={[0, 0, 1.1]} material={mat('#ffd34d', { emissive: '#ffb300', emissiveIntensity: 0.5 })} />
+      <mesh geometry={arrowGeo} position={[0, 0, 1.5]} material={mat('#ffd34d', { emissive: '#ffb300', emissiveIntensity: 0.6 })} />
     </group>
   );
 }

@@ -1,4 +1,5 @@
 import { PLACES, WEEDY_PADDIES, ELDERS } from './world.js';
+import { CHIEF_NAME, STEP_GUIDE, greetLines, missionLines, chiefHintLines } from './story.js';
 
 // ── 아이템 ───────────────────────────────────────────
 export const ITEMS = {
@@ -96,7 +97,7 @@ export const QUESTS = [
 
 // ── 상호작용 대상 ────────────────────────────────────
 // active(p): 현재 상호작용 가능 여부 / guide(p): 길안내 화살표 대상 여부
-// interact(ctx): ctx = { p, pick, take, setFlag, complete, say, hint, sfx, toast }
+// interact(ctx): ctx = { p, nickname, pick, take, setFlag, complete, say, hint, sfx, toast, setTutorial, finishTutorial }
 //   hint = 아직 조건이 안 됐을 때의 안내 대사 (say 와 같지만 다른 효과음)
 
 const pickupInteractables = PICKUPS.map((it) => ({
@@ -313,6 +314,23 @@ export const INTERACTABLES = [
     },
   },
 
+  // 촌장님: 튜토리얼 중에는 지금 할 일을, 끝난 뒤에는 다음 미션 힌트를 알려 줌
+  {
+    id: 'chief',
+    pos: [PLACES.chief[0], 0, PLACES.chief[2] + 0.8],
+    radius: 2.4,
+    active: () => true,
+    guide: () => false,
+    label: () => `대화하기 · ${CHIEF_NAME}`,
+    interact: (ctx) => {
+      const step = ctx.p.tutorial ?? 'done';
+      if (step === 'greet') ctx.say(CHIEF_NAME, greetLines(ctx.nickname), 'talk', () => ctx.setTutorial('move'));
+      else if (step === 'mission') ctx.say(CHIEF_NAME, missionLines, 'talk', () => ctx.finishTutorial());
+      else if (STEP_GUIDE[step]) ctx.say(CHIEF_NAME, [STEP_GUIDE[step].chief]);
+      else ctx.say(CHIEF_NAME, chiefHintLines(ctx.p));
+    },
+  },
+
   // 안내 NPC
   {
     id: 'sparrowGuide',
@@ -324,7 +342,7 @@ export const INTERACTABLES = [
     interact: (ctx) =>
       ctx.say('말하는 참새 짹짹이', [
         '짹! 가래떡 마을 농업인의 날 축제에 온 걸 환영해!',
-        '마을 곳곳의 친구들을 도와 감사 리본 5개를 모아 줘. 머리 위의 노란 화살표가 길을 알려 줄 거야!',
+        '마을 곳곳의 친구들을 도와 감사 리본 5개를 모아 줘. 발밑의 노란 화살표가 길을 알려 줄 거야!',
         '[E] 키로 줍고, 말하고, 끼워 맞출 수 있어. 퀘스트를 깰 때마다 우리 학교 점수가 올라간다구!',
       ]),
   },

@@ -11,7 +11,8 @@ export const OUTFIT_COLORS = {
   shirt: ['#fff4d6', '#ffd6e0', '#d6f0ff', '#e6ffd6', '#fff066'],
 };
 
-const emptyProgress = () => ({ flags: {}, inventory: [], completed: [], startedAt: Date.now() });
+// tutorial: 촌장님 튜토리얼 단계 (game/data/story.js 의 TUTORIAL_STEPS)
+const emptyProgress = () => ({ flags: {}, inventory: [], completed: [], startedAt: Date.now(), tutorial: 'greet' });
 
 function loadSaved() {
   try {
@@ -22,6 +23,12 @@ function loadSaved() {
 }
 
 const saved = loadSaved();
+// 튜토리얼 이전 버전의 저장 데이터: 이미 플레이한 흔적이 있으면 튜토리얼은 건너뜀
+if (saved?.progress && !saved.progress.tutorial) {
+  const p = saved.progress;
+  const played = p.completed?.length || p.inventory?.length || Object.keys(p.flags ?? {}).length;
+  p.tutorial = played ? 'done' : 'greet';
+}
 
 export const useGame = create((set, get) => ({
   // 'title' | 'intro' | 'play'
@@ -33,7 +40,8 @@ export const useGame = create((set, get) => ({
   online: true,
   serverScore: null,
   leaderboard: null,
-  dialog: null, // { speaker, lines, index }
+  dialog: null, // { speaker, lines, index, onClose }
+  tutorialFlash: null, // 튜토리얼 단계 완료 순간의 "잘했어요!" 표시 { at }
   toasts: [],
   prompt: null, // 현재 상호작용 안내 문구
   celebrateAt: 0, // 불꽃놀이 시작 시각 (performance.now)
@@ -185,16 +193,40 @@ export const useGame = create((set, get) => ({
   },
 
   // ── UI ──
-  say: (speaker, lines, sound = 'talk') => {
+  // onClose: 마지막 줄까지 읽고 닫을 때 호출 (스토리 진행용)
+  say: (speaker, lines, sound = 'talk', onClose = null) => {
     sfx.play(sound);
-    set({ dialog: { speaker, lines, index: 0 } });
+    set({ dialog: { speaker, lines, index: 0, onClose } });
+  },
+  // 지금 열려 있는 대화가 닫힐 때 할 일 추가
+  onDialogClose: (fn) => {
+    const d = get().dialog;
+    if (!d) return fn();
+    const prev = d.onClose;
+    set({ dialog: { ...d, onClose: () => (prev?.(), fn()) } });
   },
   advanceDialog: () => {
     const d = get().dialog;
     if (!d) return;
     sfx.play('blip');
     if (d.index + 1 < d.lines.length) set({ dialog: { ...d, index: d.index + 1 } });
-    else set({ dialog: null });
+    else {
+      set({ dialog: null });
+      d.onClose?.();
+    }
+  },
+
+  // ── 튜토리얼 ──
+  setTutorial: (step) => set((s) => ({ progress: { ...s.progress, tutorial: step } })),
+  // 단계 완료: "잘했어요!" 를 잠깐 보여 준 뒤 다음 단계로
+  passTutorialStep: (from, next) => {
+    if (get().progress.tutorial !== from || get().tutorialFlash) return;
+    sfx.play('deliver');
+    set({ tutorialFlash: { at: Date.now() } });
+    setTimeout(() => {
+      set({ tutorialFlash: null });
+      if (get().progress.tutorial === from) get().setTutorial(next);
+    }, 1300);
   },
   toast: (text) => {
     const id = Math.random();

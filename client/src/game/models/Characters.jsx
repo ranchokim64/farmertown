@@ -12,6 +12,8 @@ export function Villager({
   hair = '#4a2f1d',
   hatBand = '#e2574c',
   beard = false,
+  cane = false,
+  wave = false, // 오른손을 들어 흔들기 (촌장님 인사)
   motion,
   idle = true,
   ...props
@@ -34,6 +36,11 @@ export function Villager({
       legR.current.rotation.x = -swing;
       armL.current.rotation.x = -swing * 0.9;
       armR.current.rotation.x = swing * 0.9;
+      armR.current.rotation.z = 0;
+      if (wave) {
+        armR.current.rotation.x = -0.3;
+        armR.current.rotation.z = 2.5 + Math.sin(p * 3) * 0.35;
+      }
     }
     if (body.current) {
       const bob = walk > 0.05 ? Math.abs(Math.sin(p)) * 0.12 * walk : idle ? Math.sin(p) * 0.025 : 0;
@@ -132,6 +139,7 @@ export function Villager({
             </mesh>
           )}
           {hat === 'straw' && <StrawHat band={hatBand} position={[0, 0.3, 0]} />}
+          {hat === 'gat' && <Gat position={[0, 0.38, 0]} />}
           {hat === 'scarf' && (
             <mesh position={[0, 0.18, -0.02]} scale={[1.08, 0.75, 1.08]} material={mat(hatBand)}>
               <sphereGeometry args={[0.53, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.5]} />
@@ -139,7 +147,28 @@ export function Villager({
           )}
         </group>
       </group>
-      {/* 발밑 그림자 보조 */}
+      {cane && (
+        <mesh position={[-0.62, 0.55, 0.15]} rotation={[0.1, 0, -0.08]} material={mat('#7a5233')} castShadow>
+          <cylinderGeometry args={[0.04, 0.05, 1.1, 6]} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+// 갓 (촌장님)
+export function Gat(props) {
+  return (
+    <group {...props}>
+      <mesh material={mat('#2b2b33', { transparent: true, opacity: 0.88 })} castShadow>
+        <cylinderGeometry args={[0.92, 0.92, 0.03, 18]} />
+      </mesh>
+      <mesh position={[0, 0.25, 0]} material={mat('#2b2b33')} castShadow>
+        <cylinderGeometry args={[0.26, 0.3, 0.48, 12]} />
+      </mesh>
+      <mesh position={[0, 0.03, 0]} material={mat('#c9a14a')}>
+        <cylinderGeometry args={[0.305, 0.305, 0.05, 12]} />
+      </mesh>
     </group>
   );
 }
