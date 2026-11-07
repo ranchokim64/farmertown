@@ -44,7 +44,7 @@ export const STEP_GUIDE = {
     icon: '🚶',
     title: '걸어 보기',
     text: 'W A S D 또는 방향키로 걸어 보세요. Shift 를 누르면 달려요!',
-    touch: '왼쪽 아래 동그라미를 손가락으로 밀어서 걸어 보세요.',
+    touch: '왼쪽 아래 동그라미를 손가락으로 밀어서 걸어 보세요. 끝까지 밀면 달려요!',
     chief: '자, 먼저 이리저리 걸어 보렴!',
   },
   look: {

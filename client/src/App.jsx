@@ -9,11 +9,13 @@ import { ClearScreen } from './ui/ClearScreen.jsx';
 import { introCtl } from './game/CameraRig.jsx';
 import { music } from './music.js';
 import { SoundToggles } from './ui/SoundToggles.jsx';
+import { useQuality, QUALITY } from './quality.js';
 
 export default function App() {
   const phase = useGame((s) => s.phase);
   const showClear = useGame((s) => s.showClear);
   const cleared = useGame((s) => s.progress.completed.includes('final'));
+  const quality = QUALITY[useQuality((s) => s.level)];
 
   // 장면에 맞춰 배경음악 전환
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function App() {
       <div className={`stage ${phase === 'title' ? 'blurred' : ''}`}>
         <Canvas
           shadows={{ type: THREE.PCFSoftShadowMap }}
-          dpr={[1, 1.5]}
+          dpr={quality.dpr}
           camera={{ fov: 55, near: 0.1, far: 2000, position: [0, 12, 110] }}
           gl={{ antialias: true, powerPreference: 'high-performance' }}
           onCreated={({ gl }) => {

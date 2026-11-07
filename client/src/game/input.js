@@ -40,7 +40,8 @@ export function getMoveInput() {
     forward /= len;
     right /= len;
   }
-  return { forward, right, run: keys.has('ShiftLeft') || keys.has('ShiftRight') };
+  const stick = Math.hypot(joystick.x, joystick.y);
+  return { forward, right, run: keys.has('ShiftLeft') || keys.has('ShiftRight') || stick > 0.92 }; // 조이스틱 끝까지 = 달리기
 }
 
 export function getCameraTurn() {

@@ -3,6 +3,8 @@ import { useGame, OUTFIT_COLORS } from '../store.js';
 import { api } from '../api.js';
 import { resetPlayer } from '../game/runtime.js';
 import { sfx } from '../sfx.js';
+import { enterFullscreen } from '../fullscreen.js';
+import { isTouchDevice } from '../quality.js';
 
 const NICK_RE = /^[가-힣a-zA-Z0-9 ]{2,10}$/;
 
@@ -47,6 +49,8 @@ function SchoolSearch({ value, onChange }) {
         value={query}
         placeholder="🏫 우리 학교 이름을 검색하세요"
         maxLength={20}
+        autoComplete="off"
+        enterKeyHint="search"
         onChange={(e) => {
           setQuery(e.target.value);
           onChange(null);
@@ -74,6 +78,20 @@ function SchoolSearch({ value, onChange }) {
   );
 }
 
+// 터치 기기를 세로로 들고 있는지
+function usePortrait() {
+  const query = '(orientation: portrait) and (pointer: coarse)';
+  const [portrait, setPortrait] = useState(() => window.matchMedia?.(query).matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq) return undefined;
+    const on = () => setPortrait(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return portrait;
+}
+
 export function TitleScreen() {
   const { profile, sessionId, startNew, resume, resetAll, setPhase } = useGame();
   const [school, setSchool] = useState(null);
@@ -82,6 +100,7 @@ export function TitleScreen() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const canResume = !!(sessionId && profile);
+  const portrait = usePortrait();
 
   const join = async (e) => {
     e.preventDefault();
@@ -89,6 +108,7 @@ export function TitleScreen() {
     if (!school) return sfx.play('hint'), setError('학교를 검색해서 선택해 주세요.');
     if (!NICK_RE.test(nickname.trim())) return sfx.play('hint'), setError('닉네임은 한글·영문·숫자 2~10자로 지어 주세요.');
     setBusy(true);
+    if (isTouchDevice) enterFullscreen(); // 태블릿: 주소창을 숨겨 화면을 넓게 (버튼을 누른 순간에만 가능)
     try {
       await startNew({ nickname: nickname.trim(), school, outfit });
       sfx.play('start');
@@ -103,6 +123,7 @@ export function TitleScreen() {
 
   const continueGame = async () => {
     setBusy(true);
+    if (isTouchDevice) enterFullscreen();
     await resume();
     sfx.play('start');
     resetPlayer();
@@ -140,7 +161,14 @@ export function TitleScreen() {
         ) : (
           <form onSubmit={join}>
             <SchoolSearch value={school} onChange={setSchool} />
-            <input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="😊 닉네임 (2~10자)" maxLength={10} />
+            <input
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              placeholder="😊 닉네임 (2~10자)"
+              maxLength={10}
+              autoComplete="off"
+              enterKeyHint="go"
+            />
             <div className="outfit">
               <div>
                 <span>작업복</span>
@@ -176,6 +204,7 @@ export function TitleScreen() {
           </form>
         )}
         <p className="hint">회원가입 없이 바로 즐겨요 · 바른 말 고운 말 닉네임을 써 주세요</p>
+        {portrait && <p className="portrait-tip">📱↻ 태블릿을 가로로 돌리면 마을을 더 넓게 볼 수 있어요</p>}
       </div>
     </div>
   );

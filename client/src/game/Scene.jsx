@@ -14,11 +14,20 @@ import { InteractionSystem } from './Interaction.jsx';
 import { Pickups } from './Pickups.jsx';
 import { Fireworks } from './effects/Fireworks.jsx';
 import { CamBlock } from './CamBlock.jsx';
+import { useQuality, QUALITY } from '../quality.js';
 import { TutorialSystem, Chief, GiverMarks, YoungFarmer } from './Tutorial.jsx';
 
 // 태양광: 그림자 범위를 줄이기 위해 플레이어(또는 카메라 시선)를 따라다닙니다.
 function SunLight() {
   const light = useRef();
+  const q = QUALITY[useQuality((s) => s.level)];
+  // 그림자 해상도가 바뀌면 기존 그림자 맵을 버려 새 크기로 다시 만들게 함
+  useEffect(() => {
+    const l = light.current;
+    if (!l?.shadow.map) return;
+    l.shadow.map.dispose();
+    l.shadow.map = null;
+  }, [q.shadowSize]);
   useFrame(({ camera }) => {
     const l = light.current;
     if (!l) return;
@@ -34,8 +43,8 @@ function SunLight() {
       ref={light}
       intensity={2.1}
       color="#fff1d6"
-      castShadow
-      shadow-mapSize={[2048, 2048]}
+      castShadow={q.shadows}
+      shadow-mapSize={[q.shadowSize, q.shadowSize]}
       shadow-camera-left={-45}
       shadow-camera-right={45}
       shadow-camera-top={45}
@@ -45,6 +54,30 @@ function SunLight() {
       shadow-normalBias={0.04}
     />
   );
+}
+
+// 플레이 중 초당 프레임이 계속 낮으면(태블릿 등) 화질을 한 단계 자동으로 낮춤
+function QualityMonitor() {
+  const acc = useRef({ t: 0, frames: 0, warm: 0, slow: 0 });
+  useFrame((_, dt) => {
+    const a = acc.current;
+    if (useGame.getState().phase !== 'play' || document.hidden || dt > 0.5) return;
+    a.warm += dt;
+    if (a.warm < 4) return; // 처음 몇 초는 로딩 중이라 제외
+    a.t += dt;
+    a.frames += 1;
+    if (a.t < 4) return;
+    const fps = a.frames / a.t;
+    a.t = 0;
+    a.frames = 0;
+    a.slow = fps < 28 ? a.slow + 1 : 0;
+    if (a.slow >= 2 && useQuality.getState().lower()) {
+      a.slow = 0;
+      a.warm = 0;
+      useGame.getState().toast(`화면이 버벅여서 화질을 '${QUALITY[useQuality.getState().level].label}'(으)로 낮췄어요 (⚙ 버튼으로 바꿀 수 있어요)`);
+    }
+  });
+  return null;
 }
 
 function LeaderboardPoller() {
@@ -119,6 +152,7 @@ export function Scene() {
       <CameraRig />
       <Fireworks />
       <LeaderboardPoller />
+      <QualityMonitor />
     </>
   );
 }

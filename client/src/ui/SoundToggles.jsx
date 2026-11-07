@@ -1,17 +1,41 @@
 import { useEffect, useState } from 'react';
 import { sfx } from '../sfx.js';
 import { music } from '../music.js';
+import { useQuality, QUALITY, isTouchDevice } from '../quality.js';
+import { canFullscreen, isFullscreen, toggleFullscreen } from '../fullscreen.js';
+import { useGame } from '../store.js';
 
-// 효과음(M) / 배경음악(B) 켜기·끄기 버튼
+// 화면 오른쪽 위 버튼들: 전체 화면(태블릿) / 화질 / 배경음악(B) / 효과음(M)
 export function SoundToggles() {
   const [sfxMuted, setSfxMuted] = useState(sfx.isMuted());
   const [musicMuted, setMusicMuted] = useState(music.isMuted());
+  const [full, setFull] = useState(false);
+  const quality = useQuality((s) => s.level);
   useEffect(() => {
     const offs = [sfx.subscribe(setSfxMuted), music.subscribe(setMusicMuted)];
-    return () => offs.forEach((off) => off());
+    const onFull = () => setFull(isFullscreen());
+    document.addEventListener('fullscreenchange', onFull);
+    document.addEventListener('webkitfullscreenchange', onFull);
+    return () => {
+      offs.forEach((off) => off());
+      document.removeEventListener('fullscreenchange', onFull);
+      document.removeEventListener('webkitfullscreenchange', onFull);
+    };
   }, []);
+  const cycleQuality = () => {
+    const next = useQuality.getState().cycle();
+    useGame.getState().toast(`화질: ${QUALITY[next].label}`);
+  };
   return (
     <div className="sound-toggles">
+      {isTouchDevice && canFullscreen && (
+        <button title="전체 화면" aria-label="전체 화면 켜기/끄기" className={full ? '' : 'off'} onClick={toggleFullscreen}>
+          ⛶
+        </button>
+      )}
+      <button title={`화질: ${QUALITY[quality].label}`} aria-label="화질 바꾸기" className="quality" onClick={cycleQuality}>
+        ⚙<small>{QUALITY[quality].label}</small>
+      </button>
       <button title="배경음악 켜기/끄기 (B)" aria-label="배경음악 켜기/끄기" className={musicMuted ? 'off' : ''} onClick={() => music.setMuted(!musicMuted)}>
         🎵
       </button>

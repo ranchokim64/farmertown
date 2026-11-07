@@ -71,23 +71,29 @@ export function CameraRig() {
   // 마우스/터치 드래그로 시점 회전
   useEffect(() => {
     const el = gl.domElement;
-    let dragging = false;
+    // 카메라를 돌리는 손가락 하나만 추적 (조이스틱을 미는 다른 손가락의 움직임은 무시)
+    let dragId = null;
     let lastX = 0;
     const down = (e) => {
-      if (e.pointerType === 'touch' && e.clientX < window.innerWidth * 0.45) return; // 왼쪽은 조이스틱 영역
-      dragging = true;
+      if (dragId !== null) return;
+      if (e.pointerType === 'touch' && e.clientX < window.innerWidth * 0.4) return; // 왼쪽은 조이스틱 영역
+      dragId = e.pointerId;
       lastX = e.clientX;
     };
     const move = (e) => {
-      if (!dragging) return;
-      cam.yaw -= (e.clientX - lastX) * 0.006;
+      if (e.pointerId !== dragId) return;
+      cam.yaw -= (e.clientX - lastX) * (e.pointerType === 'touch' ? 0.008 : 0.006);
       lastX = e.clientX;
     };
-    const up = () => (dragging = false);
+    const up = (e) => {
+      if (e.pointerId === dragId) dragId = null;
+    };
     el.addEventListener('pointerdown', down);
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
     return () => {
+      window.removeEventListener('pointercancel', up);
       el.removeEventListener('pointerdown', down);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
@@ -97,6 +103,13 @@ export function CameraRig() {
   useFrame((state, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     t.current += dt;
+    // 세로 화면(태블릿을 세워 들었을 때)은 좌우로 보이는 폭이 좁아지므로 시야각을 넓힘
+    const aspect = state.size.width / state.size.height;
+    const fov = aspect < 1 ? 55 + (1 - aspect) * 45 : 55;
+    if (Math.abs(camera.fov - fov) > 0.1) {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }
     if (window.__ft && !window.__ft.camera) window.__ft.camera = camera; // ?debug 전용
 
     if (phase === 'title') {

@@ -186,7 +186,7 @@ export function HUD() {
     return () => clearTimeout(t);
   }, []);
   return (
-    <div className={`hud ${tutorial !== 'done' ? 'tutoring' : ''}`}>
+    <div className={`hud ${tutorial !== 'done' ? 'tutoring' : ''} ${isTouch ? 'touch' : ''}`}>
       <QuestLog />
       <SchoolPanel />
       <TutorialBanner />

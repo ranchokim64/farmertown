@@ -11,8 +11,9 @@
 }
 
 * { box-sizing: border-box; }
-html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #9fdcff; }
-body { font-family: var(--font); color: var(--ink); -webkit-font-smoothing: antialiased; user-select: none; touch-action: none; }
+html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #9fdcff; overscroll-behavior: none; }
+body { font-family: var(--font); color: var(--ink); -webkit-font-smoothing: antialiased; user-select: none; touch-action: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
 button, input { font-family: inherit; }
 
 .app, .stage { position: fixed; inset: 0; }
@@ -23,9 +24,9 @@ button, input { font-family: inherit; }
 .small { font-size: 13px; }
 
 /* ── 타이틀 ───────────────────────────── */
-.title-screen { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px;
+.title-screen { position: fixed; inset: 0; display: flex; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; padding: 16px;
   background: radial-gradient(ellipse at center, rgba(255, 248, 231, 0.15), rgba(255, 200, 80, 0.25)); }
-.title-card { width: min(440px, 100%); background: rgba(255, 248, 231, 0.94); border: 5px solid #fff; border-radius: 32px;
+.title-card { margin: auto; width: min(440px, 100%); background: rgba(255, 248, 231, 0.94); border: 5px solid #fff; border-radius: 32px;
   padding: 28px 26px 18px; box-shadow: 0 18px 50px rgba(120, 70, 10, 0.3), inset 0 -6px 0 rgba(246, 196, 69, 0.4);
   text-align: center; animation: pop 0.6s cubic-bezier(.2, 1.6, .5, 1); }
 @keyframes pop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -146,10 +147,12 @@ kbd { display: inline-block; background: #fff; color: var(--ink); border-radius:
   .prompt { bottom: 190px; font-size: 16px; }
 }
 
-.sound-toggles { position: absolute; top: 0; left: -104px; display: flex; gap: 6px; }
+.sound-toggles { position: absolute; top: 0; right: calc(100% + 8px); display: flex; gap: 6px; }
 .sound-toggles button { width: 46px; height: 46px; border-radius: 50%; border: 3px solid #fff; background: rgba(255, 248, 231, 0.92);
   font-size: 20px; cursor: pointer; box-shadow: 0 4px 12px rgba(107, 68, 40, 0.18); }
 .sound-toggles button.off { opacity: 0.5; filter: grayscale(1); }
+.sound-toggles button.quality { width: auto; min-width: 46px; padding: 0 10px; border-radius: 999px; font-size: 18px; display: flex; align-items: center; gap: 3px; }
+.sound-toggles button.quality small { font-size: 12px; color: var(--ink); white-space: nowrap; }
 .title-sound { position: fixed; top: 14px; right: 14px; z-index: 4; }
 .title-sound .sound-toggles { position: static; }
 @media (max-width: 640px) { .school-panel .sound-toggles { left: auto; right: 0; top: calc(100% + 8px); } }
@@ -182,3 +185,37 @@ kbd { display: inline-block; background: #fff; color: var(--ink); border-radius:
 .hud.tutoring .toasts { top: 175px; }
 .quest-log li.current > .q-title { color: var(--gold-deep); font-size: 16.5px; }
 .quest-log li.locked > .q-title { color: #b8a58c; }
+
+/* ── 태블릿 ───────────────────────────── */
+/* 가로 1180px 이하(세로 태블릿, 작은 태블릿): 튜토리얼 배너를 위쪽 줄(미션 창·점수판) 아래, 미션 창 오른쪽으로 */
+@media (max-width: 1180px) and (min-width: 641px) {
+  .quest-log { width: 270px; }
+  .tutorial-banner { top: 150px; left: 298px; right: 12px; transform: none; width: auto; max-width: 440px; margin: 0 auto; }
+  .hud.tutoring .toasts { top: 290px; left: calc(50% + 143px); }
+}
+/* 터치 기기: 미션 창이 왼쪽 아래 조이스틱을 가리지 않게 */
+.hud.touch .quest-log { max-height: calc(100vh - 210px); max-height: calc(100dvh - 210px); }
+.hud.touch .prompt { bottom: 180px; padding: 14px 24px; font-size: 20px; }
+.modal { max-height: calc(100dvh - 32px); }
+/* 키가 작은 가로 화면(구형 태블릿): 타이틀 카드를 조금 작게 */
+@media (max-height: 700px) {
+  .title-card { padding: 18px 22px 12px; }
+  .title-card h1 { margin: 8px 0 12px; font-size: 36px; }
+  .title-card h1 span { font-size: 22px; }
+  .title-card form { gap: 9px; }
+  .title-card input { padding: 11px 14px; }
+  .btn.primary.big { padding: 12px; }
+}
+.portrait-tip { margin: 10px 0 0; font-size: 14px; color: #3b7dd8; }
+/* 키가 작은 화면: 안내 배너를 납작하게 */
+@media (max-height: 700px) {
+  .tutorial-banner { padding: 6px 12px 8px; }
+  .tb-body { margin-top: 2px; gap: 8px; }
+  .tb-body b { font-size: 17px; }
+  .tb-body p { font-size: 14px; }
+  .tb-icon { font-size: 26px; }
+  .tb-dots { margin-top: 4px; }
+}
+@media (max-height: 700px) and (max-width: 1180px) and (min-width: 641px) {
+  .tutorial-banner { top: 130px; }
+}
