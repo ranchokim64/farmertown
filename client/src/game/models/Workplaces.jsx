@@ -133,7 +133,7 @@ function Stall({ awning = '#e2574c', goods = '#ff7b54', ...props }) {
   );
 }
 
-export function Market({ flags }) {
+export function Market({ flags, tteokStarted }) {
   return (
     <group>
       <Stall position={[22.5, 0, 2.2]} awning="#e2574c" goods="#ff7b54" />
@@ -154,13 +154,13 @@ export function Market({ flags }) {
         )}
       </group>
       {ELDERS.map((e, i) => (
-        <Elder key={e.id} elder={e} index={i} served={!!flags[e.id]} />
+        <Elder key={e.id} elder={e} index={i} served={!!flags[e.id]} asking={tteokStarted && !flags[e.id]} />
       ))}
     </group>
   );
 }
 
-function Elder({ elder, index, served }) {
+function Elder({ elder, index, served, asking }) {
   const bubble = useRef();
   useFrame((state) => {
     if (bubble.current) bubble.current.position.y = 3.0 + Math.sin(state.clock.elapsedTime * 2 + index) * 0.1;
@@ -174,17 +174,15 @@ function Elder({ elder, index, served }) {
     <group position={elder.pos}>
       <Villager {...outfits} hair="#e6e6e6" scale={0.95} />
       <group ref={bubble}>
-        {served ? (
-          <Label text="❤️" width={0.9} height={0.9} bg={null} fontSize={0.6} />
-        ) : (
+        {served && <Label text="❤️" width={0.9} height={0.9} bg={null} fontSize={0.6} />}
+        {asking && (
           <group>
             <mesh material={mat('#ffffff')}>
               <sphereGeometry args={[0.55, 12, 10]} />
             </mesh>
             <Tteok color={TTEOK_COLORS[elder.want]} position={[0, 0, 0.45]} scale={0.7} />
           </group>
-        )}
-      </group>
+        )}      </group>
     </group>
   );
 }
@@ -414,15 +412,15 @@ export function Shed() {
 }
 
 // ── 들판: 농부, 허수아비, 참새, 잡초 논 표시 ───────────
-export function FieldLife({ flags, completed }) {
+// snailActive / scarecrowActive: 그 미션이 진행 중일 때만 목표 표시
+export function FieldLife({ flags, completed, snailActive, scarecrowActive }) {
   return (
     <group>
       <Villager position={PLACES.farmer} rotation={[0, -Math.PI / 2, 0]} overall="#3cb371" shirt="#ffffff" hatBand="#3b7dd8" />
-      {!completed.includes('snail') && !flags.got_basket && <QuestMark position={[PLACES.farmer[0], 3.2, PLACES.farmer[2]]} />}
-      <Scarecrow dressed={completed.includes('scarecrow')} />
+      <Scarecrow dressed={completed.includes('scarecrow')} marked={scarecrowActive} />
       <SparrowFlock fled={completed.includes('scarecrow')} />
       {WEEDY_PADDIES.map((w) => (
-        <WeedyMarker key={w.id} paddy={w} released={!!flags[w.id]} />
+        <WeedyMarker key={w.id} paddy={w} released={!!flags[w.id]} marked={snailActive} />
       ))}
     </group>
   );
@@ -446,7 +444,7 @@ export function QuestMark({ color = '#ffd34d', text = '!', ...props }) {
   );
 }
 
-function Scarecrow({ dressed }) {
+function Scarecrow({ dressed, marked }) {
   return (
     <group position={PLACES.scarecrow} rotation={[0, -Math.PI / 2, 0]}>
       <mesh position={[0, 1.4, 0]} material={mat(PALETTE.wood)} castShadow>
@@ -482,7 +480,7 @@ function Scarecrow({ dressed }) {
           </mesh>
         </>
       )}
-      {!dressed && <QuestMark position={[0, 4, 0]} text="?" color="#ffb3a7" />}
+      {!dressed && marked && <QuestMark position={[0, 4, 0]} text="👕" color="#ffb3a7" />}
     </group>
   );
 }
@@ -519,7 +517,7 @@ function SparrowFlock({ fled }) {
   );
 }
 
-function WeedyMarker({ paddy, released }) {
+function WeedyMarker({ paddy, released, marked }) {
   const snails = useRef();
   useFrame((state) => {
     if (snails.current) snails.current.children.forEach((s, i) => {
@@ -530,12 +528,12 @@ function WeedyMarker({ paddy, released }) {
   return (
     <group position={[paddy.x, 0, paddy.z]}>
       {!released ? (
-        <group>
+        marked && <group>
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, -PADDY_SIZE.d / 2 - 0.6]}>
             <ringGeometry args={[1.2, 1.6, 24]} />
             <meshBasicMaterial color="#ff4d4d" transparent opacity={0.85} />
           </mesh>
-          <QuestMark position={[0, 3, -PADDY_SIZE.d / 2]} color="#ff6b6b" text="!" />
+          <QuestMark position={[0, 3, -PADDY_SIZE.d / 2]} color="#ff6b6b" text="🐌" />
         </group>
       ) : (
         <group ref={snails}>

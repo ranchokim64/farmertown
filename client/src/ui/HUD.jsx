@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../store.js';
-import { QUESTS, ITEMS } from '../game/data/quests.js';
+import { QUESTS, ITEMS, currentQuest } from '../game/data/quests.js';
 import { joystick, fireInteract } from '../game/input.js';
 import { SoundToggles } from './SoundToggles.jsx';
 import { TutorialBanner } from './TutorialBanner.jsx';
@@ -21,16 +21,18 @@ function QuestLog() {
       </button>
       {open && (
         <ol>
-          {QUESTS.map((q) => {
+          {QUESTS.map((q, n) => {
+            // 미션은 차례대로: 끝난 것 ✅ / 지금 미션은 할 일 목록 / 나머지는 🔒
             const done = progress.completed.includes(q.id);
+            const current = currentQuest(progress) === q.id;
+            const locked = !done && !current;
             const steps = q.steps(progress);
-            const locked = q.id === 'final' && !steps[0].done;
             return (
-              <li key={q.id} className={done ? 'done' : locked ? 'locked' : ''}>
+              <li key={q.id} className={done ? 'done' : locked ? 'locked' : 'current'}>
                 <div className="q-title">
-                  {done ? '✅' : '⬜'} {q.title} <span className="muted">· {q.place}</span>
+                  {done ? '✅' : locked ? '🔒' : '👉'} {n + 1}. {q.title} <span className="muted">· {q.place}</span>
                 </div>
-                {!done && (
+                {current && (
                   <ul>
                     {steps.map((st, i) => (
                       <li key={i} className={st.done ? 'done' : ''}>

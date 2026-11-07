@@ -180,3 +180,5 @@ kbd { display: inline-block; background: #fff; color: var(--ink); border-radius:
   .tutorial-banner { top: auto; bottom: 170px; }
 }
 .hud.tutoring .toasts { top: 175px; }
+.quest-log li.current > .q-title { color: var(--gold-deep); font-size: 16.5px; }
+.quest-log li.locked > .q-title { color: #b8a58c; }

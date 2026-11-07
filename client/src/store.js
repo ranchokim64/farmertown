@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { api, ApiError } from './api.js';
-import { MAIN_QUESTS } from './game/data/quests.js';
+import { MAIN_QUESTS, QUESTS, QUEST_START_ITEMS } from './game/data/quests.js';
 import { sfx } from './sfx.js';
 import { music } from './music.js';
 
@@ -127,6 +127,15 @@ export const useGame = create((set, get) => ({
   take: (ids) =>
     set((s) => ({ progress: { ...s.progress, inventory: s.progress.inventory.filter((i) => !ids.includes(i)) } })),
   setFlag: (id) => set((s) => ({ progress: { ...s.progress, flags: { ...s.progress.flags, [id]: true } } })),
+
+  // NPC 에게 미션을 맡음: 시작 표시 + 받는 물건 + 알림
+  startQuest: (questId) => {
+    if (get().progress.flags[`start_${questId}`]) return;
+    get().setFlag(`start_${questId}`);
+    (QUEST_START_ITEMS[questId] ?? []).forEach((id) => get().pick(id));
+    const title = QUESTS.find((q) => q.id === questId)?.title;
+    get().toast(`📜 새 미션: ${title}`);
+  },
 
   complete: (questId) => {
     const { progress } = get();

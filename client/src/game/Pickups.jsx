@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGame } from '../store.js';
-import { PICKUPS, ITEMS } from './data/quests.js';
+import { PICKUPS, ITEMS, questStarted } from './data/quests.js';
 import { mat } from './materials.js';
 import { Label } from './canvasText.jsx';
 import { StrawHat } from './models/Characters.jsx';
@@ -89,6 +89,7 @@ function Pickup({ item, index }) {
 }
 
 export function Pickups() {
-  const flags = useGame((s) => s.progress.flags);
-  return PICKUPS.filter((it) => !flags[it.id]).map((it) => <Pickup key={it.id} item={it} index={PICKUPS.indexOf(it)} />);
+  const progress = useGame((s) => s.progress);
+  // 자기 미션을 맡은 뒤에만 나타남 (다른 미션의 물건이 미리 보여 헷갈리지 않게)
+  return PICKUPS.filter((it) => !progress.flags[it.id] && questStarted(progress, it.quest)).map((it) => <Pickup key={it.id} item={it} index={PICKUPS.indexOf(it)} />);
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGame } from '../store.js';
-import { MAIN_QUESTS } from './data/quests.js';
+import { MAIN_QUESTS, questActive, questStarted } from './data/quests.js';
 import { PLACES, WEEDY_PADDIES } from './data/world.js';
 import { player } from './runtime.js';
 import { Sky, Clouds, Ground, RiceFields, Weeds, Trees, Mountains, HayBales } from './models/Environment.jsx';
@@ -14,7 +14,7 @@ import { InteractionSystem } from './Interaction.jsx';
 import { Pickups } from './Pickups.jsx';
 import { Fireworks } from './effects/Fireworks.jsx';
 import { CamBlock } from './CamBlock.jsx';
-import { TutorialSystem, Chief } from './Tutorial.jsx';
+import { TutorialSystem, Chief, GiverMarks, YoungFarmer } from './Tutorial.jsx';
 
 // 태양광: 그림자 범위를 줄이기 위해 플레이어(또는 카메라 시선)를 따라다닙니다.
 function SunLight() {
@@ -92,21 +92,23 @@ export function Scene() {
       <CamBlock>
         <DangsanTree ribbons={completed.includes('final') ? 5 : ribbons} glowing={completed.includes('final')} />
       </CamBlock>
-      {ribbons === 5 && !completed.includes('final') && <QuestMark position={[PLACES.dangsan[0], 12.5, PLACES.dangsan[2]]} text="🎀" />}
+      {questActive(progress, 'final') && <QuestMark position={[PLACES.dangsan[0], 12.5, PLACES.dangsan[2]]} text="🎀" />}
       {/* 카메라가 뚫고 들어가지 않도록 등록하는 건물/구조물 (온실 유리는 투명이라 제외) */}
       <CamBlock>
         <Scoreboard leaderboard={leaderboard} mySchoolCode={schoolCode} />
         <Gate />
         <Houses />
         <Mill />
-        <Market flags={flags} />
+        <Market flags={flags} tteokStarted={questStarted(progress, 'tteok') && !completed.includes('tteok')} />
         <Shed />
       </CamBlock>
       <Clothesline />
       <Greenhouse fixed={completed.includes('smartfarm')} />
-      <FieldLife flags={flags} completed={completed} />
+      <FieldLife flags={flags} completed={completed} snailActive={questActive(progress, 'snail')} scarecrowActive={questActive(progress, 'scarecrow')} />
 
       <Chief />
+      <YoungFarmer />
+      <GiverMarks />
       <TutorialSystem />
       <Sparrow position={PLACES.sparrowGuide} rotation={[0, 0.8, 0]} color="#c98a4b" />
       <Frog position={PLACES.frog} rotation={[0, Math.PI / 2, 0]} />

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useGame } from '../store.js';
-import { INTERACTABLES } from './data/quests.js';
+import { INTERACTABLES, isGuideTarget } from './data/quests.js';
 import { player } from './runtime.js';
 import { onInteract } from './input.js';
 import { mat } from './materials.js';
@@ -41,6 +41,7 @@ export function interactNow() {
     setFlag: s.setFlag,
     complete: s.complete,
     say: s.say,
+    startQuest: s.startQuest,
     hint: (speaker, lines) => s.say(speaker, lines, 'hint'),
     sfx: sfx.play,
     toast: s.toast,
@@ -68,7 +69,7 @@ export function InteractionSystem() {
       s.setPrompt(near && !s.dialog ? near.it.label(p) : null);
       const step = p.tutorial ?? 'done';
       const guideFilter =
-        step === 'done' ? (it) => it.guide(p)
+        step === 'done' ? (it) => isGuideTarget(it, p)
         : step === 'talk' ? (it) => it.id === 'sparrowGuide'
         : step === 'pickup' ? (it) => it.id.startsWith('hanja_') && it.active(p)
         : () => false; // 첫 인사/걷기/둘러보기/미션 설명 중에는 화살표 숨김

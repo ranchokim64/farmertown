@@ -6,6 +6,7 @@ import { CHIEF_NAME, greetLines, missionLines } from './data/story.js';
 import { PLACES } from './data/world.js';
 import { Villager } from './models/Characters.jsx';
 import { QuestMark } from './models/Workplaces.jsx';
+import { npcWithNews } from './data/quests.js';
 
 const MOVE_GOAL = 6; // m 만큼 걸으면 통과
 const LOOK_GOAL = 1.4; // 라디안(약 80°) 만큼 둘러보면 통과
@@ -83,15 +84,38 @@ export function TutorialSystem() {
 }
 
 
+// 다음 미션을 맡길 NPC 머리 위의 ❗
+const NPC_MARK_POS = {
+  chief: [PLACES.chief[0], 3.6, PLACES.chief[2]],
+  farmer: [PLACES.farmer[0], 3.4, PLACES.farmer[2]],
+  miller: [PLACES.miller[0], 3.4, PLACES.miller[2]],
+  youngFarmer: [PLACES.youngFarmer[0], 3.4, PLACES.youngFarmer[2]],
+};
+export function GiverMarks() {
+  const npc = useGame((s) => npcWithNews(s.progress));
+  if (!npc) return null;
+  return <QuestMark position={NPC_MARK_POS[npc]} text="❗" color="#ffd34d" />;
+}
+
+// 청년 농부: 온실 입구 옆
+export function YoungFarmer() {
+  return (
+    <group position={PLACES.youngFarmer} rotation={[0, -0.35, 0]}>
+      <Villager overall="#2e8b57" shirt="#d6f0ff" hat="none" hair="#2b1d12" />
+    </group>
+  );
+}
+
 // 촌장님: 분수대 앞에 서서 플레이어 쪽을 바라봄. 튜토리얼 첫 인사 때는 손을 흔듦
 export function Chief() {
   const step = useGame((s) => s.progress.tutorial ?? 'done');
+  const hasNews = useGame((s) => npcWithNews(s.progress) === 'chief'); // ❗ 는 GiverMarks 가 띄움
   const [x, , z] = PLACES.chief;
   const face = Math.atan2(0 - x, 8 - z); // 시작 위치의 플레이어를 바라보기
   return (
     <group position={PLACES.chief} rotation={[0, face, 0]}>
       <Villager overall="#3b4a6b" shirt="#f8f4ea" hat="gat" hair="#eeeeee" beard cane wave={step === 'greet'} />
-      {step === 'done' && <QuestMark position={[0, 3.4, 0]} text="?" color="#9fdcff" />}
+      {step === 'done' && !hasNews && <QuestMark position={[0, 3.4, 0]} text="?" color="#9fdcff" />}
     </group>
   );
 }

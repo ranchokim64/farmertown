@@ -1,5 +1,7 @@
+// 퀘스트 진행 규칙. 미션은 차례대로 열리고, 각 미션은 맡기는 NPC 와 이야기해야 시작됩니다.
+// 대사는 story.js 에 있습니다.
 import { PLACES, WEEDY_PADDIES, ELDERS } from './world.js';
-import { CHIEF_NAME, STEP_GUIDE, greetLines, missionLines, chiefHintLines } from './story.js';
+import { CHIEF_NAME, NPCS, STORY, STEP_GUIDE, greetLines, missionLines, chiefHintLines } from './story.js';
 
 // ── 아이템 ───────────────────────────────────────────
 export const ITEMS = {
@@ -16,7 +18,7 @@ export const ITEMS = {
   sensor: { name: '온·습도 센서', icon: '📟' },
 };
 
-// 바닥에 놓여 있는 줍기 아이템
+// 바닥에 놓여 있는 줍기 아이템 (자기 미션이 시작돼야 나타남)
 export const PICKUPS = [
   { id: 'hanja_sip_a', quest: 'soil', pos: [10, 0, -5] },
   { id: 'hanja_sip_b', quest: 'soil', pos: [-9, 0, 7] },
@@ -31,11 +33,46 @@ export const PICKUPS = [
 ];
 
 export const MAIN_QUESTS = ['soil', 'snail', 'scarecrow', 'tteok', 'smartfarm'];
+export const QUEST_ORDER = [...MAIN_QUESTS, 'final'];
 
-// ── 퀘스트 목록 (HUD 표시용) ─────────────────────────
+// 각 미션을 맡기는 NPC (흙의 비밀은 튜토리얼에서 촌장님이 맡김)
+export const QUEST_GIVER = { soil: 'chief', snail: 'farmer', scarecrow: 'farmer', tteok: 'miller', smartfarm: 'youngFarmer', final: 'chief' };
+
+// 미션을 맡을 때 NPC 에게 받는 물건
+export const QUEST_START_ITEMS = { snail: ['snail_basket'] };
+
+// ── 진행 상태 ─────────────────────────────────────────
 const has = (p, id) => p.inventory.includes(id);
 const flag = (p, id) => !!p.flags[id];
 const count = (p, ids) => ids.filter((id) => flag(p, id) || has(p, id)).length;
+const HANJA = ['hanja_sip_a', 'hanja_sip_b', 'hanja_il_a', 'hanja_il_b'];
+const TTEOK = ['tteok_white', 'tteok_ssuk', 'tteok_pumpkin'];
+
+// 지금 해야 할 미션 (차례대로 첫 번째 미완료)
+export const currentQuest = (p) => QUEST_ORDER.find((q) => !p.completed.includes(q)) ?? null;
+
+// 미션을 맡았는지 (NPC 와 시작 대화를 했는지)
+export function questStarted(p, q) {
+  if (p.completed.includes(q)) return true;
+  if (q === 'soil') return ['pickup', 'mission', 'done'].includes(p.tutorial ?? 'done') || flag(p, 'start_soil');
+  if (q === 'snail') return flag(p, 'start_snail') || flag(p, 'got_basket'); // got_basket: 예전 저장 데이터
+  return flag(p, `start_${q}`);
+}
+
+// 지금 진행 중인 미션인지 (차례가 왔고, 맡았고, 아직 안 끝남)
+export const questActive = (p, q) => currentQuest(p) === q && questStarted(p, q);
+
+// 머리 위에 ❗ 를 띄울 NPC: 다음 미션을 맡길 사람
+export function npcWithNews(p) {
+  const q = currentQuest(p);
+  if (!q || questStarted(p, q) || (p.tutorial ?? 'done') !== 'done') return null;
+  return QUEST_GIVER[q];
+}
+
+export const ribbonsOf = (p) => MAIN_QUESTS.filter((q) => p.completed.includes(q)).length;
+
+// ── 퀘스트 목록 (HUD 표시용) ─────────────────────────
+const giverStep = (p, q) => ({ text: `${NPCS[QUEST_GIVER[q]].name}의 이야기 듣기`, done: questStarted(p, q) });
 
 export const QUESTS = [
   {
@@ -43,7 +80,7 @@ export const QUESTS = [
     title: "'흙(土)'의 비밀",
     place: '광장',
     steps: (p) => [
-      { text: `광장에 흩어진 한자 조각 줍기 (${count(p, ['hanja_sip_a', 'hanja_sip_b', 'hanja_il_a', 'hanja_il_b'])}/4)`, done: count(p, ['hanja_sip_a', 'hanja_sip_b', 'hanja_il_a', 'hanja_il_b']) === 4 },
+      { text: `광장에 흩어진 한자 조각 줍기 (${count(p, HANJA)}/4)`, done: count(p, HANJA) === 4 },
       { text: '분수대 앞 부서진 비석에 끼워 맞추기', done: p.completed.includes('soil') },
     ],
   },
@@ -52,7 +89,7 @@ export const QUESTS = [
     title: '우렁이 특공대 출동',
     place: '들판',
     steps: (p) => [
-      { text: '들판의 농부 아저씨에게 우렁이 바구니 받기', done: flag(p, 'got_basket') },
+      giverStep(p, 'snail'),
       { text: `잡초가 무성한 논에 우렁이 풀어주기 (${WEEDY_PADDIES.filter((w) => flag(p, w.id)).length}/3)`, done: p.completed.includes('snail') },
     ],
   },
@@ -61,6 +98,7 @@ export const QUESTS = [
     title: '허수아비 옷 입히기',
     place: '들판',
     steps: (p) => [
+      giverStep(p, 'scarecrow'),
       { text: '장터에서 밀짚모자 찾기', done: count(p, ['straw_hat']) === 1 },
       { text: '빨랫줄에서 낡은 셔츠 찾기', done: count(p, ['old_shirt']) === 1 },
       { text: '들판의 허수아비에게 입혀 참새 쫓기', done: p.completed.includes('scarecrow') },
@@ -71,15 +109,17 @@ export const QUESTS = [
     title: '따끈따끈 삼색 가래떡',
     place: '방앗간 → 장터',
     steps: (p) => [
-      { text: `방앗간에서 가래떡 3개 줍기 (${count(p, ['tteok_white', 'tteok_ssuk', 'tteok_pumpkin'])}/3)`, done: count(p, ['tteok_white', 'tteok_ssuk', 'tteok_pumpkin']) === 3 },
+      giverStep(p, 'tteok'),
+      { text: `방앗간에서 가래떡 3개 줍기 (${count(p, TTEOK)}/3)`, done: count(p, TTEOK) === 3 },
       { text: `장터 평상의 어르신께 배달하기 (${ELDERS.filter((e) => flag(p, e.id)).length}/3)`, done: p.completed.includes('tteok') },
     ],
   },
   {
     id: 'smartfarm',
     title: '스마트팜 고치기',
-    place: '창고 → 온실',
+    place: '온실 → 창고 → 온실',
     steps: (p) => [
+      giverStep(p, 'smartfarm'),
       { text: '창고에서 온·습도 센서 찾기', done: count(p, ['sensor']) === 1 },
       { text: '온실 안 고장 난 콘솔에 센서 장착하기', done: p.completed.includes('smartfarm') },
     ],
@@ -89,143 +129,132 @@ export const QUESTS = [
     title: '[최종] 황금 들판 감사 트리',
     place: '광장',
     steps: (p) => [
-      { text: `감사 리본 모으기 (${MAIN_QUESTS.filter((q) => p.completed.includes(q)).length}/5)`, done: MAIN_QUESTS.every((q) => p.completed.includes(q)) },
+      { text: `감사 리본 모으기 (${ribbonsOf(p)}/5)`, done: ribbonsOf(p) === 5 },
+      { text: '촌장님께 리본 보여 드리기', done: questStarted(p, 'final') },
       { text: '광장의 당산나무에 리본 매달기', done: p.completed.includes('final') },
     ],
   },
 ];
 
 // ── 상호작용 대상 ────────────────────────────────────
-// active(p): 현재 상호작용 가능 여부 / guide(p): 길안내 화살표 대상 여부
-// interact(ctx): ctx = { p, nickname, pick, take, setFlag, complete, say, hint, sfx, toast, setTutorial, finishTutorial }
-//   hint = 아직 조건이 안 됐을 때의 안내 대사 (say 와 같지만 다른 효과음)
+// quest: 이 대상이 속한 미션 (그 미션이 진행 중일 때만 [E] 가 뜨고 화살표가 가리킴)
+// active(p): 상호작용 가능 여부 / guide(p): 길안내 화살표 대상 여부
+// interact(ctx): ctx = { p, nickname, pick, take, setFlag, complete, say, hint, sfx, toast, startQuest, setTutorial, finishTutorial }
 
-const pickupInteractables = PICKUPS.map((it) => ({
-  id: it.id,
-  pos: it.pos,
-  radius: 2.0,
-  active: (p) => !flag(p, it.id),
-  guide: (p) => !flag(p, it.id) && !p.completed.includes(it.quest),
-  label: () => `줍기 · ${ITEMS[it.id].name}`,
-  interact: (ctx) => {
-    ctx.pick(it.id);
-    ctx.setFlag(it.id);
-  },
-}));
+// 미션 대상: 자기 미션이 진행 중일 때만 활성
+const questTarget = (q, it) => ({
+  ...it,
+  quest: q,
+  active: (p) => questActive(p, q) && it.active(p),
+  guide: (p) => questActive(p, q) && it.guide(p),
+});
+
+const pickupInteractables = PICKUPS.map((it) =>
+  questTarget(it.quest, {
+    id: it.id,
+    pos: it.pos,
+    radius: 2.0,
+    active: (p) => !flag(p, it.id),
+    guide: (p) => !flag(p, it.id),
+    label: () => `줍기 · ${ITEMS[it.id].name}`,
+    interact: (ctx) => {
+      ctx.pick(it.id);
+      ctx.setFlag(it.id);
+    },
+  }),
+);
+
+// 미션을 맡기는 NPC 공통 대화: 차례 전 / 미션 시작 / 진행 중 / 끝난 뒤
+function questGiverTalk(ctx, npc, quests) {
+  const p = ctx.p;
+  const name = NPCS[npc].name;
+  const cur = currentQuest(p);
+  const mine = quests.find((q) => q === cur);
+  if (mine && !questStarted(p, mine)) {
+    const s = STORY[mine];
+    ctx.say(name, s.start, 'talk', () => ctx.startQuest(mine));
+    return true;
+  }
+  if (mine) return false; // 진행 중: 호출한 쪽에서 안내
+  const allDone = quests.every((q) => p.completed.includes(q));
+  if (!allDone) ctx.say(name, STORY[quests[0]].before ?? ['나중에 다시 와 주렴!']);
+  return !allDone ? true : null; // null: 다 끝남 → 호출한 쪽에서 감사 대사
+}
 
 export const INTERACTABLES = [
   ...pickupInteractables,
 
   // 1. 흙(土)의 비밀
-  {
+  questTarget('soil', {
     id: 'tablet',
     pos: PLACES.tablet,
     radius: 2.6,
-    active: (p) => !p.completed.includes('soil'),
-    guide: (p) => count(p, ['hanja_sip_a', 'hanja_sip_b', 'hanja_il_a', 'hanja_il_b']) === 4 && !p.completed.includes('soil'),
+    active: () => true,
+    guide: (p) => count(p, HANJA) === 4,
     label: () => '조각 끼워 맞추기 · 부서진 비석',
     interact: (ctx) => {
-      const pieces = ['hanja_sip_a', 'hanja_sip_b', 'hanja_il_a', 'hanja_il_b'];
-      const have = pieces.filter((id) => has(ctx.p, id));
-      if (have.length < 4) {
-        ctx.hint('부서진 비석', [
-          `비석에 홈이 4개 파여 있어요. 지금 조각은 ${have.length}개!`,
-          '광장 곳곳에 반짝이는 十 조각 2개와 一 조각 2개를 찾아보세요.',
-        ]);
-        return;
-      }
-      ctx.take(pieces);
+      const have = HANJA.filter((id) => has(ctx.p, id)).length;
+      if (have < 4) return ctx.hint('부서진 비석', STORY.soil.remindTablet(have));
+      ctx.take(HANJA);
       ctx.complete('soil');
-      ctx.say('비석의 비밀', [
-        '딸깍! 十 과 一 이 합쳐지자… 흙 토(土) 글자가 두 개 나타났어요!',
-        "土 를 풀어 쓰면 十(열 십) + 一(한 일) = '十一', 즉 11 이에요.",
-        "土 가 두 번 → 土月 土日 → 十一月 十一日 = '11월 11일'!",
-        '농업인은 흙에서 나서 흙과 더불어 살다 흙으로 돌아간다는 뜻을 담아, 11월 11일을 농업인의 날로 정했답니다.',
-        "🎀 감사 리본을 받았어요! (+10점)",
-      ]);
+      ctx.say('비석의 비밀', STORY.soil.done);
     },
-  },
+  }),
 
-  // 2. 우렁이 특공대
+  // 2·3. 농부 아저씨: 우렁이 → 허수아비
   {
     id: 'farmer',
     pos: PLACES.farmer,
     radius: 2.8,
     active: () => true,
-    guide: (p) => !flag(p, 'got_basket'),
+    guide: () => false,
     label: () => '대화하기 · 농부 아저씨',
     interact: (ctx) => {
+      const r = questGiverTalk(ctx, 'farmer', ['snail', 'scarecrow']);
+      if (r === true) return;
+      if (r === null) return ctx.say('농부 아저씨', STORY.scarecrow.farmerAfter);
       const p = ctx.p;
-      if (p.completed.includes('snail')) {
-        ctx.say('농부 아저씨', ['우렁이들이 잡초를 냠냠 먹어 치우고 있어! 정말 고마워.', '농약을 덜 쓰니 땅도, 물도, 벼도 모두 건강해진단다.']);
-      } else if (!flag(p, 'got_basket')) {
-        ctx.pick('snail_basket');
-        ctx.setFlag('got_basket');
-        ctx.say('농부 아저씨', [
-          '어이쿠, 잘 왔다! 논에 잡초가 너무 많이 자라서 큰일이야.',
-          '이 바구니에 든 우렁이들은 물속 잡초를 아주 좋아해. 그래서 농약 대신 우렁이가 잡초를 없애 주지!',
-          '이걸 친환경 "우렁이 농법"이라고 한단다.',
-          '빨간 표시가 있는 논 3곳에 우렁이를 풀어 주겠니? 🐌',
-        ]);
-      } else {
-        ctx.say('농부 아저씨', [`빨간 표시가 있는 논이 아직 ${3 - WEEDY_PADDIES.filter((w) => flag(p, w.id)).length}곳 남았어. 부탁한다!`]);
-      }
+      if (currentQuest(p) === 'snail') return ctx.say('농부 아저씨', STORY.snail.remind(3 - WEEDY_PADDIES.filter((w) => flag(p, w.id)).length));
+      const need = ['straw_hat', 'old_shirt'].filter((id) => !has(p, id) && !flag(p, id)).map((id) => ITEMS[id].name);
+      ctx.say('농부 아저씨', need.length ? STORY.scarecrow.remind(need.join('와 ')) : ['다 찾았구나! 어서 허수아비에게 입혀 주렴.']);
     },
   },
-  ...WEEDY_PADDIES.map((w) => ({
-    id: w.id,
-    pos: [w.x, 0, w.z - 7.5],
-    radius: 3.2,
-    active: (p) => !flag(p, w.id),
-    guide: (p) => flag(p, 'got_basket') && !flag(p, w.id),
-    label: (p) => (has(p, 'snail_basket') ? '우렁이 풀어주기 · 잡초 논' : '살펴보기 · 잡초 논'),
-    interact: (ctx) => {
-      if (!has(ctx.p, 'snail_basket')) {
-        ctx.hint('잡초가 무성한 논', ['잡초가 벼보다 더 많아 보여요…', '들판 입구의 농부 아저씨께 이야기를 들어 보세요.']);
-        return;
-      }
-      ctx.setFlag(w.id);
-      ctx.sfx('splash');
-      const done = WEEDY_PADDIES.filter((x) => x.id === w.id || flag(ctx.p, x.id)).length;
-      if (done === 3) {
+  ...WEEDY_PADDIES.map((w) =>
+    questTarget('snail', {
+      id: w.id,
+      pos: [w.x, 0, w.z - 7.5],
+      radius: 3.2,
+      active: (p) => !flag(p, w.id),
+      guide: (p) => !flag(p, w.id),
+      label: () => '우렁이 풀어주기 · 잡초 논',
+      interact: (ctx) => {
+        ctx.setFlag(w.id);
+        ctx.sfx('splash');
+        const done = WEEDY_PADDIES.filter((x) => x.id === w.id || flag(ctx.p, x.id)).length;
+        if (done < 3) return ctx.toast(`🐌 우렁이 출동! (${done}/3)`);
         ctx.take(['snail_basket']);
         ctx.complete('snail');
-        ctx.say('우렁이 특공대', ['우렁이 특공대 출동 완료! 잡초가 쏙쏙 사라지고 있어요.', '🎀 감사 리본을 받았어요! (+10점)']);
-      } else {
-        ctx.toast(`🐌 우렁이 출동! (${done}/3)`);
-      }
-    },
-  })),
-
-  // 3. 허수아비
-  {
+        ctx.say('우렁이 특공대', STORY.snail.done);
+      },
+    }),
+  ),
+  questTarget('scarecrow', {
     id: 'scarecrow',
     pos: PLACES.scarecrow,
     radius: 2.8,
-    active: (p) => !p.completed.includes('scarecrow'),
+    active: () => true,
     guide: (p) => has(p, 'straw_hat') && has(p, 'old_shirt'),
     label: () => '옷 입히기 · 허수아비',
     interact: (ctx) => {
       const need = ['straw_hat', 'old_shirt'].filter((id) => !has(ctx.p, id));
-      if (need.length) {
-        ctx.hint('허수아비 뼈대', [
-          '짹짹! 참새들이 벼 이삭을 쪼아 먹고 있어요.',
-          `허수아비에게 ${need.map((id) => ITEMS[id].name).join('와 ')}이(가) 필요해요.`,
-          '밀짚모자는 장터에, 낡은 셔츠는 마을 빨랫줄에 있대요.',
-        ]);
-        return;
-      }
+      if (need.length) return ctx.hint('허수아비 뼈대', STORY.scarecrow.remindScarecrow(need.map((id) => ITEMS[id].name).join('와 ')));
       ctx.take(['straw_hat', 'old_shirt']);
       ctx.complete('scarecrow');
-      ctx.say('허수아비', [
-        '짠! 멋쟁이 허수아비 완성! 참새들이 깜짝 놀라 날아가요. 푸드득~',
-        '허수아비는 옛날부터 새들로부터 소중한 곡식을 지켜 준 들판의 지킴이랍니다.',
-        '🎀 감사 리본을 받았어요! (+10점)',
-      ]);
+      ctx.say('허수아비', STORY.scarecrow.done);
     },
-  },
+  }),
 
-  // 4. 삼색 가래떡
+  // 4. 방앗간 주인 → 어르신 배달
   {
     id: 'miller',
     pos: PLACES.miller,
@@ -233,88 +262,77 @@ export const INTERACTABLES = [
     active: () => true,
     guide: () => false,
     label: () => '대화하기 · 방앗간 주인',
-    interact: (ctx) =>
-      ctx.say('방앗간 주인', [
-        '어서 와! 갓 뽑은 가래떡이 김이 모락모락 나지?',
-        '11월 11일은 "가래떡 데이"이기도 해. 길쭉한 가래떡이 숫자 1을 닮았거든!',
-        '우리 쌀로 만든 하얀 떡, 쑥 떡, 단호박 떡을 장터 평상의 어르신들께 배달해 주렴.',
-      ]),
-  },
-  ...ELDERS.map((e) => ({
-    id: e.id,
-    pos: [e.pos[0], 0, e.pos[2] + 1.2],
-    radius: 1.7,
-    active: (p) => !flag(p, e.id),
-    guide: (p) => has(p, e.want),
-    label: () => `배달하기 · ${e.name}`,
     interact: (ctx) => {
-      if (!has(ctx.p, e.want)) {
-        ctx.hint(e.name, [`아이고, 배가 출출하구나. 나는 ${ITEMS[e.want].name}이 먹고 싶은데…`, '방앗간에 가면 있을 거란다.']);
-        return;
-      }
-      ctx.take([e.want]);
-      ctx.setFlag(e.id);
-      ctx.sfx('deliver');
-      const done = ELDERS.filter((x) => x.id === e.id || flag(ctx.p, x.id)).length;
-      if (done === 3) {
-        ctx.complete('tteok');
-        ctx.say(e.name, ['고맙다, 얘야! 우리 쌀로 만든 떡이 최고야.', '삼색 가래떡 배달 완료! 🎀 감사 리본을 받았어요! (+10점)']);
-      } else {
-        ctx.say(e.name, ['오호, 쫄깃쫄깃 맛있구나! 고맙다 얘야.', `(배달 ${done}/3)`]);
-      }
+      const r = questGiverTalk(ctx, 'miller', ['tteok']);
+      if (r === true) return;
+      ctx.say('방앗간 주인', r === null ? STORY.tteok.millerAfter : STORY.tteok.remind);
     },
-  })),
+  },
+  ...ELDERS.map((e) =>
+    questTarget('tteok', {
+      id: e.id,
+      pos: [e.pos[0], 0, e.pos[2] + 1.2],
+      radius: 1.7,
+      active: (p) => !flag(p, e.id),
+      guide: (p) => has(p, e.want),
+      label: () => `배달하기 · ${e.name}`,
+      interact: (ctx) => {
+        if (!has(ctx.p, e.want)) return ctx.hint(e.name, STORY.tteok.elderWrong(ITEMS[e.want].name));
+        ctx.take([e.want]);
+        ctx.setFlag(e.id);
+        ctx.sfx('deliver');
+        const done = ELDERS.filter((x) => x.id === e.id || flag(ctx.p, x.id)).length;
+        if (done < 3) return ctx.say(e.name, STORY.tteok.elderThanks(done));
+        ctx.complete('tteok');
+        ctx.say(e.name, STORY.tteok.done);
+      },
+    }),
+  ),
 
-  // 5. 스마트팜
+  // 5. 청년 농부 → 창고 센서 → 온실 콘솔
   {
+    id: 'youngFarmer',
+    pos: [PLACES.youngFarmer[0], 0, PLACES.youngFarmer[2] + 0.8],
+    radius: 2.4,
+    active: () => true,
+    guide: () => false,
+    label: () => '대화하기 · 청년 농부',
+    interact: (ctx) => {
+      const r = questGiverTalk(ctx, 'youngFarmer', ['smartfarm']);
+      if (r === true) return;
+      ctx.say('청년 농부', r === null ? STORY.smartfarm.after : STORY.smartfarm.remind);
+    },
+  },
+  questTarget('smartfarm', {
     id: 'console',
     pos: [PLACES.console[0], 0, PLACES.console[2] + 1.6],
     radius: 2.4,
-    active: (p) => !p.completed.includes('smartfarm'),
+    active: () => true,
     guide: (p) => has(p, 'sensor'),
     label: () => '센서 장착하기 · 스마트팜 콘솔',
     interact: (ctx) => {
-      if (!has(ctx.p, 'sensor')) {
-        ctx.hint('스마트팜 콘솔', ['삐빅! [오류] 온·습도 센서를 찾을 수 없습니다.', '창고에 예비 센서가 있을지도 몰라요.']);
-        return;
-      }
+      if (!has(ctx.p, 'sensor')) return ctx.hint('스마트팜 콘솔', STORY.smartfarm.remindConsole);
       ctx.take(['sensor']);
       ctx.complete('smartfarm');
-      ctx.say('스마트팜 콘솔', [
-        '삐빅! 센서 연결 완료. 온도 22℃ · 습도 65% · 토양 수분 부족 → 스프링클러 가동!',
-        '스마트팜은 센서와 컴퓨터로 작물이 자라기 좋은 환경을 자동으로 맞춰 주는 똑똑한 농장이에요.',
-        '🎀 감사 리본을 받았어요! (+10점)',
-      ]);
+      ctx.say('스마트팜 콘솔', STORY.smartfarm.done);
     },
-  },
+  }),
 
-  // 6. 최종: 당산나무
-  {
+  // 6. 촌장님 → 당산나무
+  questTarget('final', {
     id: 'dangsan',
     pos: [PLACES.dangsan[0] + 2.2, 0, PLACES.dangsan[2] + 2.2],
     radius: 3.2,
-    active: (p) => !p.completed.includes('final'),
-    guide: (p) => MAIN_QUESTS.every((q) => p.completed.includes(q)),
+    active: () => true,
+    guide: () => true,
     label: () => '감사 리본 매달기 · 당산나무',
     interact: (ctx) => {
-      const n = MAIN_QUESTS.filter((q) => ctx.p.completed.includes(q)).length;
-      if (n < 5) {
-        ctx.hint('마을 당산나무', [
-          '수백 년 동안 마을을 지켜 온 당산나무예요.',
-          `감사 리본 5개를 모두 모아 오면 황금 들판 감사 트리를 완성할 수 있어요. (지금 ${n}/5)`,
-        ]);
-        return;
-      }
       ctx.complete('final');
-      ctx.say('황금 들판 감사 트리', [
-        '리본 5개를 매달자 당산나무가 황금빛으로 반짝여요! 🎆',
-        '우리가 매일 먹는 밥 한 그릇에는 농업인의 땀과 정성이 담겨 있어요.',
-        '농업인 여러분, 고맙습니다! 🌾',
-      ]);
+      ctx.say('황금 들판 감사 트리', STORY.final.done);
     },
-  },
+  }),
 
-  // 촌장님: 튜토리얼 중에는 지금 할 일을, 끝난 뒤에는 다음 미션 힌트를 알려 줌
+  // 촌장님: 튜토리얼 → 최종 미션 시작 → 그 밖에는 지금 할 일을 알려 줌
   {
     id: 'chief',
     pos: [PLACES.chief[0], 0, PLACES.chief[2] + 0.8],
@@ -323,11 +341,15 @@ export const INTERACTABLES = [
     guide: () => false,
     label: () => `대화하기 · ${CHIEF_NAME}`,
     interact: (ctx) => {
-      const step = ctx.p.tutorial ?? 'done';
-      if (step === 'greet') ctx.say(CHIEF_NAME, greetLines(ctx.nickname), 'talk', () => ctx.setTutorial('move'));
-      else if (step === 'mission') ctx.say(CHIEF_NAME, missionLines, 'talk', () => ctx.finishTutorial());
-      else if (STEP_GUIDE[step]) ctx.say(CHIEF_NAME, [STEP_GUIDE[step].chief]);
-      else ctx.say(CHIEF_NAME, chiefHintLines(ctx.p));
+      const p = ctx.p;
+      const step = p.tutorial ?? 'done';
+      if (step === 'greet') return ctx.say(CHIEF_NAME, greetLines(ctx.nickname), 'talk', () => ctx.setTutorial('move'));
+      if (step === 'mission') return ctx.say(CHIEF_NAME, missionLines, 'talk', () => ctx.finishTutorial());
+      if (STEP_GUIDE[step]) return ctx.say(CHIEF_NAME, [STEP_GUIDE[step].chief]);
+      const cur = currentQuest(p);
+      if (cur === 'final' && !questStarted(p, 'final')) return ctx.say(CHIEF_NAME, STORY.final.start, 'talk', () => ctx.startQuest('final'));
+      if (cur === 'final') return ctx.say(CHIEF_NAME, STORY.final.remind);
+      ctx.say(CHIEF_NAME, chiefHintLines({ current: cur, started: cur && questStarted(p, cur), giver: cur && QUEST_GIVER[cur], ribbons: ribbonsOf(p) }));
     },
   },
 
@@ -342,8 +364,8 @@ export const INTERACTABLES = [
     interact: (ctx) =>
       ctx.say('말하는 참새 짹짹이', [
         '짹! 가래떡 마을 농업인의 날 축제에 온 걸 환영해!',
-        '마을 곳곳의 친구들을 도와 감사 리본 5개를 모아 줘. 발밑의 노란 화살표가 길을 알려 줄 거야!',
-        '[E] 키로 줍고, 말하고, 끼워 맞출 수 있어. 퀘스트를 깰 때마다 우리 학교 점수가 올라간다구!',
+        '마을 사람들을 차례차례 도와 감사 리본 5개를 모아 줘. 발밑의 노란 화살표가 길을 알려 줄 거야!',
+        '머리 위에 ❗ 가 떠 있는 사람에게 말을 걸면 새로운 미션을 받을 수 있어. 미션을 깰 때마다 우리 학교 점수가 올라간다구!',
       ]),
   },
   {
@@ -361,3 +383,11 @@ export const INTERACTABLES = [
       ]),
   },
 ];
+
+// 길안내 화살표가 가리킬 대상: 미션을 아직 안 맡았으면 맡길 NPC, 맡았으면 그 미션의 다음 목표
+export function isGuideTarget(it, p) {
+  const q = currentQuest(p);
+  if (!q) return false;
+  if (!questStarted(p, q)) return it.id === QUEST_GIVER[q];
+  return it.quest === q && it.guide(p);
+}
