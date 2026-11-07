@@ -1,0 +1,87 @@
+/* 활동지 A4 인쇄 스타일: 흰 바탕 + 연한 색 포인트 (흑백 인쇄에서도 읽히도록) */
+@page { size: A4; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: 'Gowun Dodum', 'Malgun Gothic', sans-serif; color: #3d2a14; font-size: 11.8pt; line-height: 1.55;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+h1, h2, h3, h4, .qn, .mno, .band, .place, .star, .lead b { font-family: 'Jua', sans-serif; font-weight: normal; }
+.page { width: 210mm; height: 297mm; padding: 11mm 13mm 12mm; position: relative; overflow: hidden; page-break-after: always; }
+.page:last-child { page-break-after: auto; }
+footer { position: absolute; bottom: 5.5mm; left: 13mm; right: 13mm; text-align: center; font-size: 8pt; color: #b39a7c; }
+.teacher footer { color: #d0574a; }
+
+/* 머리말 */
+.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 6mm; border-bottom: 3px solid #f6c445; padding-bottom: 3mm; }
+.titles .sub { font-family: 'Jua'; color: #e2574c; font-size: 11pt; }
+h1 { margin: 0; font-size: 25pt; color: #b9790a; letter-spacing: -0.5px; }
+.who { border-collapse: collapse; font-size: 9.5pt; }
+.who td { border: 1.5px solid #e9c58a; padding: 1.6mm 2.4mm; white-space: nowrap; }
+.who td.w { width: 34mm; }
+
+/* 촌장님 부탁 */
+.intro { display: flex; gap: 4mm; align-items: center; margin: 3.5mm 0 2.5mm; background: #fff8e7; border: 1.5px solid #f3dfb2; border-radius: 4mm; padding: 2.5mm 4mm; }
+.intro b { font-family: 'Jua'; color: #e2574c; font-size: 11.5pt; }
+.intro p { margin: 0.5mm 0 0; font-size: 10pt; }
+.thumb { width: 27mm; height: 27mm; border-radius: 4mm; object-fit: cover; flex: none; border: 2px solid #fff; box-shadow: 0 0 0 1.5px #e9c58a; }
+.thumb.round { width: 18mm; height: 18mm; border-radius: 50%; }
+
+.band { margin: 3mm 0 2mm; font-size: 14pt; color: #fff; background: #3cb371; border-radius: 3mm; padding: 1mm 4mm; }
+.band.teal { background: #3b7dd8; }
+
+/* 미션 카드 */
+.mission { display: flex; gap: 4mm; border: 1.8px solid #f0dcb4; border-radius: 4.5mm; padding: 3.4mm 4.5mm 3mm; margin-bottom: 3.3mm; break-inside: avoid; }
+.mission .body { flex: 1; }
+.mission h3 { margin: 0 0 1mm; font-size: 14.5pt; display: flex; align-items: center; gap: 2mm; }
+.mno { background: #f6c445; color: #6b3d0a; border-radius: 99px; padding: 0.3mm 3mm; font-size: 10.5pt; }
+.mno.gold { background: #9fdcff; color: #1d4f8a; }
+.place { font-size: 9.5pt; color: #9a7b5c; }
+.ribbon { width: 9mm; height: 9mm; margin-left: auto; }
+ol { list-style: none; margin: 0; padding: 0; }
+ol > li { display: flex; gap: 2mm; align-items: flex-start; margin: 2.4mm 0; flex-wrap: wrap; }
+ol > li > p { margin: 0; flex: 1; min-width: 60%; }
+.qn { display: inline-flex; align-items: center; justify-content: center; width: 5.2mm; height: 5.2mm; border-radius: 50%;
+  background: #fff3cf; border: 1.3px solid #f6c445; font-size: 9pt; flex: none; margin-top: 0.4mm; margin-right: 1mm; }
+.blank { display: inline-block; border-bottom: 1.6px solid #3d2a14; height: 1.75em; vertical-align: bottom; margin: 0 0.5mm; text-align: center; }
+.blank.ans { color: #d42f2f; font-weight: bold; border-bottom-color: #d42f2f; }
+.muted { color: #9a7b5c; margin: 0 0 1mm; font-size: 9.8pt; }
+
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 5mm; margin: 1.5mm 0 0 7mm; width: 100%; }
+.choice { padding: 0.4mm 2mm; border-radius: 99px; }
+.choice.picked { outline: 2px solid #d42f2f; color: #d42f2f; }
+
+table.mini { border-collapse: collapse; margin: 1mm 0 0 7mm; font-size: 10pt; }
+table.mini th, table.mini td { border: 1.4px solid #e9c58a; padding: 2mm 4mm; text-align: center; }
+table.mini th { background: #fff3cf; font-family: 'Jua'; font-weight: normal; }
+table.mini.wide { width: calc(100% - 7mm); }
+table.mini.wide td { text-align: left; }
+table.mini td.c { text-align: center; white-space: nowrap; }
+table.mini td.tall { height: 15mm; }
+table.mini col.c1 { width: 17%; } table.mini col.c2 { width: 27%; }
+.exa, .example { color: #d42f2f; font-size: 9.5pt; }
+.example { margin: 1mm 0 0 7mm; padding: 2mm 3mm; border: 1.4px dashed #d42f2f; border-radius: 2mm; }
+
+.tteoks { display: flex; gap: 8mm; margin: 1mm 0 0 7mm; }
+.tteok { display: flex; flex-direction: column; align-items: center; gap: 1mm; }
+.tteok .stick { width: 30mm; height: 9mm; border: 1.8px solid #3d2a14; border-radius: 99px; }
+
+/* 게임을 마치고 */
+.box { border: 1.6px solid #f0dcb4; border-radius: 4mm; padding: 2.2mm 4mm; margin-bottom: 2.6mm; }
+.lead { margin: 0 0 1mm; display: flex; align-items: center; flex-wrap: wrap; gap: 1mm; }
+.star { color: #3b7dd8; font-size: 9pt; border: 1.2px solid #3b7dd8; border-radius: 99px; padding: 0 2mm; margin-left: 1mm; }
+.order { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4mm 5mm; margin: 0.8mm 0 0 7mm; }
+.oi { display: flex; align-items: center; gap: 2mm; font-size: 10pt; }
+.obox { width: 7mm; height: 7mm; border: 1.6px solid #3d2a14; border-radius: 1.5mm; display: inline-flex; align-items: center; justify-content: center; flex: none; color: #d42f2f; font-weight: bold; }
+.lines { margin: 1mm 0 0 7mm; }
+.lines div { border-bottom: 1.3px dashed #c9b392; height: 8.5mm; }
+.card { border: 2.2px solid #ff9aa2; border-radius: 5mm; padding: 2.5mm 5mm; margin-bottom: 2.6mm; background: #fff7f8; }
+.card .to { font-family: 'Jua'; color: #e2574c; margin-left: 7mm; }
+.card .lines div { border-bottom-color: #f2b8be; }
+.card .from { text-align: right; font-family: 'Jua'; color: #e2574c; margin-top: 1mm; }
+.rate { display: flex; justify-content: space-between; margin: 0.6mm 0 0 7mm; font-size: 10pt; }
+.stars { letter-spacing: 2mm; color: #e9a825; font-size: 13pt; line-height: 1; }
+
+/* 교사용 */
+h4 { margin: 3.5mm 0 1.5mm; font-size: 12pt; color: #3b7dd8; }
+.tips { margin: 0; padding-left: 5mm; }
+.tips li { margin: 1mm 0; }
+.note { margin: 0; }
