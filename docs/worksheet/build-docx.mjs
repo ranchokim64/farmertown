@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import * as C from './content.mjs';
+import { qrPng } from './qr.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -19,6 +20,7 @@ const RED = 'D42F2F';
 const GOLD = 'E9A825';
 const LINE = 'E9C58A';
 const W = 10206; // A4 폭 11906 - 좌우 여백 850*2 (DXA)
+const QR = await qrPng(C.GAME_URL);
 const img = (name) => fs.readFileSync(path.join(here, 'img', `${name}.jpg`));
 
 const run = (text, o = {}) => new TextRun({ text, font: FONT, size: o.size ?? 22, bold: o.bold, color: o.color ?? BROWN, underline: o.underline });
@@ -135,8 +137,18 @@ const pageBreak = () => new Paragraph({ children: [new PageBreak()] });
 function build(teacher) {
   const S = [];
   // 1쪽
-  S.push(para([run(`🌾 ${C.SUBTITLE}`, { color: 'E2574C', size: 22, bold: true })], { before: 0, after: 0 }));
-  S.push(para([run(C.TITLE, { size: 44, bold: true, color: 'B9790A' })], { before: 0, after: 120 }));
+  // 제목 + 오른쪽 구석 게임 입장 QR
+  S.push(
+    table(
+      [W - 1700, 1700],
+      [[
+        { children: [para([run(`🌾 ${C.SUBTITLE}`, { color: 'E2574C', size: 22, bold: true })], { before: 0, after: 0 }), para([run(C.TITLE, { size: 44, bold: true, color: 'B9790A' })], { before: 0, after: 0 })] },
+        { children: [para([new ImageRun({ type: 'png', data: QR, transformation: { width: 76, height: 76 } })], { align: AlignmentType.CENTER, before: 0, after: 0 }), para([run('📱 게임 입장', { size: 16, bold: true, color: 'E2574C' })], { align: AlignmentType.CENTER, before: 0, after: 0 })] },
+      ]],
+      { borders: noBorders },
+    ),
+  );
+  S.push(para([], { before: 0, after: 60 }));
   S.push(table([3400, 1400, W - 4800], [['____학년 ____반 ____번', '이름', ''], ['게임 닉네임', { children: [para([run('')])], span: 2 }]]));
   S.push(para([run(C.INTRO.speaker, { bold: true, color: 'E2574C' }), run(`  ${C.INTRO.text}`, { size: 20 })], { shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'FFF8E7' }, before: 160, after: 80 }));
   S.push(band('🗺️ 게임하며 미션 기록하기'));

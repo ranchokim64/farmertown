@@ -11,25 +11,29 @@ footer { position: absolute; bottom: 5.5mm; left: 13mm; right: 13mm; text-align:
 .teacher footer { color: #d0574a; }
 
 /* 머리말 */
-.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 6mm; border-bottom: 3px solid #f6c445; padding-bottom: 3mm; }
+.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 4mm; border-bottom: 3px solid #f6c445; padding-bottom: 3mm; }
 .titles .sub { font-family: 'Jua'; color: #e2574c; font-size: 11pt; }
-h1 { margin: 0; font-size: 25pt; color: #b9790a; letter-spacing: -0.5px; }
-.who { border-collapse: collapse; font-size: 9.5pt; }
+h1 { margin: 0; font-size: 25pt; color: #b9790a; letter-spacing: -0.5px; white-space: nowrap; }
+.titles { flex: none; }
+.who { border-collapse: collapse; font-size: 9.5pt; margin-left: auto; }
+.qr { display: flex; flex-direction: column; align-items: center; flex: none; margin-bottom: -1mm; }
+.qr img { width: 19mm; height: 19mm; display: block; }
+.qr span { font-family: 'Jua'; font-size: 8pt; color: #e2574c; margin-top: -0.5mm; }
 .who td { border: 1.5px solid #e9c58a; padding: 1.6mm 2.4mm; white-space: nowrap; }
-.who td.w { width: 34mm; }
+.who td.w { width: 24mm; }
 
 /* 촌장님 부탁 */
-.intro { display: flex; gap: 4mm; align-items: center; margin: 3.5mm 0 2.5mm; background: #fff8e7; border: 1.5px solid #f3dfb2; border-radius: 4mm; padding: 2.5mm 4mm; }
+.intro { display: flex; gap: 4mm; align-items: center; margin: 3mm 0 2mm; background: #fff8e7; border: 1.5px solid #f3dfb2; border-radius: 4mm; padding: 2.5mm 4mm; }
 .intro b { font-family: 'Jua'; color: #e2574c; font-size: 11.5pt; }
 .intro p { margin: 0.5mm 0 0; font-size: 10pt; }
 .thumb { width: 27mm; height: 27mm; border-radius: 4mm; object-fit: cover; flex: none; border: 2px solid #fff; box-shadow: 0 0 0 1.5px #e9c58a; }
 .thumb.round { width: 18mm; height: 18mm; border-radius: 50%; }
 
-.band { margin: 3mm 0 2mm; font-size: 14pt; color: #fff; background: #3cb371; border-radius: 3mm; padding: 1mm 4mm; }
+.band { margin: 2.5mm 0 2mm; font-size: 14pt; color: #fff; background: #3cb371; border-radius: 3mm; padding: 1mm 4mm; }
 .band.teal { background: #3b7dd8; }
 
 /* 미션 카드 */
-.mission { display: flex; gap: 4mm; border: 1.8px solid #f0dcb4; border-radius: 4.5mm; padding: 3.4mm 4.5mm 3mm; margin-bottom: 3.3mm; break-inside: avoid; }
+.mission { display: flex; gap: 4mm; border: 1.8px solid #f0dcb4; border-radius: 4.5mm; padding: 3.3mm 4.5mm 2.9mm; margin-bottom: 3.1mm; break-inside: avoid; }
 .mission .body { flex: 1; }
 .mission h3 { margin: 0 0 1mm; font-size: 14.5pt; display: flex; align-items: center; gap: 2mm; }
 .mno { background: #f6c445; color: #6b3d0a; border-radius: 99px; padding: 0.3mm 3mm; font-size: 10.5pt; }

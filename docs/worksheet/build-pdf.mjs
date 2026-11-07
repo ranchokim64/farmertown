@@ -5,11 +5,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import * as C from './content.mjs';
+import { qrPng } from './qr.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 
+const QR = `data:image/png;base64,${(await qrPng(C.GAME_URL)).toString('base64')}`;
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const img = (name) => `data:image/jpeg;base64,${fs.readFileSync(path.join(here, 'img', `${name}.jpg`)).toString('base64')}`;
 
@@ -62,6 +64,7 @@ function header() {
     <div class="titles"><div class="sub">🌾 ${C.SUBTITLE}</div><h1>${C.TITLE}</h1></div>
     <table class="who"><tr><td>___학년 ___반 ___번</td><td>이름</td><td class="w"></td></tr>
     <tr><td>게임 닉네임</td><td colspan="2" class="w"></td></tr></table>
+    <div class="qr"><img src="${QR}" alt="게임 입장 QR코드"><span>📱 게임 입장</span></div>
   </header>`;
 }
 
