@@ -9,62 +9,35 @@
 
 ## 구성
 
+```
+브라우저 ──▶ GitHub Pages (게임 화면: client/dist 정적 파일)
+   └──────▶ Supabase (Postgres 함수 ft_api_* 를 공개 키로 직접 호출)
+```
+
 | 폴더 | 내용 |
 | --- | --- |
 | `client/` | React 18 + React Three Fiber(Three.js) + zustand. 타이틀/인트로/인게임/클리어 화면, 로우폴리 마을 전체를 코드로 생성 (외부 3D 에셋 없음) |
-| `server/` | Node.js(Express). 세션, 퀘스트 완료 → 학교 점수 합산, 랭킹, 학교 검색 프록시, 비속어 필터, Rate Limit. 저장소는 Postgres(Supabase) 또는 Redis |
-| `api/` | Vercel 서버리스 함수 진입점 (`server/` 의 Express 앱을 그대로 사용) |
-| `supabase/` | Supabase(Postgres) 테이블·함수 마이그레이션 SQL |
+| `supabase/` | 백엔드 전부: 테이블, 학교 검색·세션·퀘스트 완료·랭킹 API 함수, 비속어 필터, Rate Limit (`migrations/*.sql`) |
+| `.github/workflows/deploy-pages.yml` | 기본 브랜치에 푸시하면 빌드해서 GitHub Pages 로 배포 |
 
-## 빠르게 실행하기
+## 배포 (GitHub Pages + Supabase)
+
+순서는 **[docs/DEPLOY.md](docs/DEPLOY.md)** 에 정리돼 있습니다. 요약하면:
+
+1. Supabase SQL Editor 에 `supabase/migrations/` 의 SQL 실행
+2. GitHub 저장소 Settings → Pages → Source 를 **GitHub Actions** 로
+3. Settings → Secrets and variables → Actions → **Variables** 에 `SUPABASE_URL`, `SUPABASE_KEY`(publishable 키)
+4. Actions 탭에서 워크플로 실행 → `https://<계정>.github.io/<저장소>/`
+
+## 로컬에서 실행하기
 
 ```bash
 npm run install:all
-
-# 터미널 1: API 서버 (REDIS_URL 이 없으면 인메모리 Mock Redis 로 실행)
-npm run dev:server          # http://localhost:3001
-
-# 터미널 2: 클라이언트 개발 서버 (/api 는 3001 로 프록시)
-npm run dev:client          # http://localhost:5173
+cp client/.env.example client/.env.local   # Supabase 주소/공개 키 입력 (비워 두면 오프라인 모드)
+npm run dev                                # http://localhost:5173
 ```
 
-운영 배포 (빌드된 클라이언트를 API 서버가 함께 서빙):
-
-```bash
-npm run build && REDIS_URL=redis://localhost:6379 npm start
-# 또는
-docker compose up --build   # Redis 포함, http://localhost:3001
-```
-
-### 배포 (Vercel + Supabase)
-
-자세한 순서는 **[docs/DEPLOY.md](docs/DEPLOY.md)** 에 있습니다. 구조는 이렇습니다.
-
-```
-브라우저 ──▶ Vercel ─┬─ client/dist (정적 파일: 게임 화면)
-                     └─ api/index.js (서버리스 함수: Express 앱) ──▶ Supabase Postgres (커넥션 풀러)
-```
-
-- DB 스키마/함수: `supabase/migrations/*.sql` (SQL Editor 에 붙여 넣고 Run)
-- 환경 변수: `DATABASE_URL` (필수, Supabase Transaction pooler 주소), `NEIS_API_KEY` (선택)
-- 다른 서버에 올릴 때는 `docker compose up --build` (Redis 사용)
-
-### 환경 변수 (server)
-
-| 이름 | 기본값 | 설명 |
-| --- | --- | --- |
-| `PORT` | `3001` | |
-| `DATABASE_URL` | (없음) | Postgres/Supabase 연결 문자열. 있으면 이 저장소를 사용 (Vercel 배포 시 필수) |
-| `REDIS_URL` | (없음) | `DATABASE_URL` 이 없을 때 사용하는 Redis. 둘 다 없으면 개발용 인메모리 Mock (재시작 시 초기화) |
-| `NEIS_API_KEY` | (없음) | [나이스 교육정보 개방 포털](https://open.neis.go.kr) 키. 없으면 샘플 모드(최대 5건), 호출 실패 시 예시 학교 목록 사용 |
-| `TRUST_PROXY` | `0` | 리버스 프록시 뒤라면 홉 수(`1`) 또는 `true`(PaaS, 맨 앞 IP 사용) — 실제 학생 IP 를 Rate Limit 에 사용. Vercel 함수는 자동으로 `true` |
-| `RL_IP_PER_MIN` | `1200` | IP 당 분당 API 호출 수 |
-| `RL_SESSION_CREATE_PER_MIN` | `120` | IP 당 분당 세션 생성 수 |
-| `RL_SESSION_PER_MIN` | `60` | 세션 당 분당 API 호출 수 |
-| `QUEST_COOLDOWN_MS` | `3000` | 같은 세션의 퀘스트 완료 요청 최소 간격 |
-| `MIN_MS_PER_QUEST` | `8000` | n번째 퀘스트는 세션 시작 후 n×값 이후에만 인정 |
-
-> 학교는 보통 공인 IP 하나(NAT)를 학생 전체가 공유하므로 **IP 제한은 넉넉하게**, 점수 조작 방어는 **세션 단위 쿨타임 + 최소 소요 시간 + 퀘스트 중복 방지(SADD)** 가 담당합니다.
+Supabase 없이도 게임은 끝까지 플레이할 수 있습니다 (점수판·랭킹만 비활성).
 
 ## 조작법
 
@@ -96,32 +69,36 @@ docker compose up --build   # Redis 포함, http://localhost:3001
 
 점수: 퀘스트 1개당 **+10점**, 최종 엔딩 **+50점** (1인 최대 100점, 소속 학교에 합산)
 
-## API
+## 백엔드 (Supabase SQL 함수)
 
-| Method | Path | 설명 |
-| --- | --- | --- |
-| `GET` | `/api/schools?q=` | 학교 검색(자동완성). NEIS 결과를 Redis 에 하루 캐시 |
-| `POST` | `/api/session` | `{ sessionId(UUID v4), nickname, school: {code, name} }` 세션 생성. 이미 있으면 기존 정보 반환(세션 복구) |
-| `GET` | `/api/session/:id` | 세션 조회 (닉네임, 학교, 완료 퀘스트, 점수, 클리어 기록) |
-| `POST` | `/api/session/:id/complete` | `{ questId }` 퀘스트 완료 → 학교 점수 합산. 중복은 0점, 최종은 5개 완료 후에만 |
-| `GET` | `/api/leaderboard?school=` | 학교 TOP 5, 스피드런 TOP 10, 내 학교 순위 |
+GitHub Pages 에는 서버가 없으므로 서버가 하던 일을 Postgres 함수가 합니다. 브라우저는 공개 키로 아래 5개 함수만 호출할 수 있습니다
+(`POST https://<project>.supabase.co/rest/v1/rpc/<함수>`). 오류는 `{"status": 400|404|409|429, "error", "message", "retryAfterMs"}` 로 돌려줍니다.
 
-저장소는 `server/src/stores/` 의 같은 인터페이스를 따르는 두 구현이 있습니다.
+| 함수 | 설명 |
+| --- | --- |
+| `ft_api_search_schools(p_q)` | 학교 검색(자동완성). DB 안에서 NEIS API 호출(`http` 확장) 후 하루 캐시. 실패하면 예시 학교 목록 |
+| `ft_api_create_session(p_session, p_nickname, p_school_code, p_school_name)` | 세션 생성. 같은 UUID 면 기존 정보 반환(세션 복구) |
+| `ft_api_get_session(p_session)` | 세션 조회 (닉네임, 학교, 완료 퀘스트, 점수, 클리어 기록) |
+| `ft_api_complete(p_session, p_quest)` | 퀘스트 완료 → 학교 점수 합산. 중복은 0점, 최종은 5개 완료 후에만 |
+| `ft_api_leaderboard(p_limit, p_school)` | 학교 TOP N, 스피드런 TOP 10, 내 학교 순위 |
 
-- **Postgres (Supabase)**: `ft_sessions`, `ft_session_quests`(중복 완료 방지 PK), `ft_schools`(학교 점수), `ft_rate_limits`, `ft_cache`. 점수 합산·쿨타임·Rate Limit 은 SQL 함수(`ft_complete_quest`, `ft_cooldown`, `ft_rate_hit`)로 원자적으로 처리. 모든 테이블 RLS 켬 + 공개 역할 권한 제거 → anon 키로는 접근 불가.
-- **Redis**: `sess:{id}`(hash), `sess:{id}:done`(set), `lb:schools`(zset), `lb:speed`(zset), `school:names`(hash), `rl:*`/`cd:*`.
+테이블: `ft_sessions`, `ft_session_quests`(중복 완료 방지 PK), `ft_schools`(학교 점수), `ft_rate_limits`, `ft_cache`, `ft_config`(점수·제한 값·NEIS 키).
 
 ### 보안 · 예외 처리
 
-- **비속어 필터** (`server/src/profanity.js`): 공백·숫자·기호를 제거한 뒤 검사해 `시 1 발`, `ㅅㅂ` 같은 우회도 차단. 닉네임과 직접 입력한 학교명 모두 검사.
-- **Rate Limit** (`server/src/rateLimit.js`): IP 고정 윈도, 세션 고정 윈도, 퀘스트 완료 쿨타임(SET NX PX), 플레이 시간 기반 최소 소요 시간.
-- **세션 복구**: 브라우저 LocalStorage(`farmertown:v1`)에 UUID·닉네임·학교·진행도를 저장. 새로고침하면 "이어서 축제 즐기기"로 그대로 이어집니다. 서버가 꺼져 있어도 오프라인으로 진행되고, 연결되면 밀린 완료 기록을 순서대로 전송합니다.
-- 클리어 시간은 서버가 세션 생성 시각 기준으로 직접 계산합니다.
+- **공개 키로 할 수 있는 것은 API 함수 호출뿐**: 모든 테이블 RLS 켬 + 공개 역할(anon/authenticated) 권한 제거, 내부 함수 실행 권한 제거.
+  API 함수는 `SECURITY DEFINER` 로 실행되며 입력을 직접 검증합니다.
+- **비속어 필터** (`ft_has_profanity`): 공백·숫자·기호를 지운 뒤 검사해 `시 1 발` 같은 우회도 차단. 닉네임과 직접 입력한 학교명 모두 검사. 단어 목록은 마이그레이션 SQL 안에 있습니다.
+- **Rate Limit**: 학생 IP(Supabase 가 넘겨 주는 `X-Forwarded-For`) 기준 분당 호출, 세션 기준 분당 호출, 퀘스트 완료 쿨타임, 플레이 시간 기반 최소 소요 시간.
+  학교는 공인 IP 하나를 학생 전체가 공유하므로 IP 제한은 넉넉하게 두고, 점수 조작 방어는 세션 단위 제한이 담당합니다. 값은 `ft_config` 테이블에서 바꿀 수 있습니다.
+- **세션 복구**: 브라우저 LocalStorage(`farmertown:v1`)에 UUID·닉네임·학교·진행도를 저장. 새로고침하면 "이어서 축제 즐기기"로 이어집니다.
+  Supabase 에 연결되지 않아도 오프라인으로 진행되고, 연결되면 밀린 완료 기록을 순서대로 전송합니다.
+- 클리어 시간은 DB 가 세션 생성 시각 기준으로 직접 계산합니다.
 
 ## 개발 메모
 
-- `server`: `npm test` (node:test, 인메모리 저장소). `TEST_DATABASE_URL=postgres://...` 를 주면 Postgres 저장소로도 같은 테스트를 실행합니다.
-- 루트 `package.json` 의 dependencies 는 Vercel 함수 번들용입니다 (`server/package.json` 과 같은 목록을 유지하세요).
-- 클라이언트 디버그 핸들: `?debug` 로 접속하면 `window.__ft` 노출 (점수는 서버가 검증하므로 영향 없음)
+- DB 테스트: `TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres npm run test:db` — 로컬 Postgres 에 `ft_test` DB 를 만들어
+  마이그레이션(2번 실행)과 API 함수 테스트를 브라우저와 같은 anon 역할로 실행합니다.
+- 클라이언트 디버그 핸들: `?debug` 로 접속하면 `window.__ft` 노출 (점수는 DB 가 검증하므로 영향 없음)
 - 마을 배치는 `client/src/game/data/world.js`, 퀘스트 로직/대사는 `client/src/game/data/quests.js` 에 모여 있습니다.
 - 모든 3D 모델은 Three.js 기본 도형으로 만든 로우폴리이며, 한글 간판은 캔버스 텍스처로 그려 외부 폰트 CDN 없이도 보입니다 (UI 폰트는 Google Fonts `Jua`, 없으면 시스템 폰트).
