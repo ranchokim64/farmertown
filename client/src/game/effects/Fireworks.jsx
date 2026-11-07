@@ -2,13 +2,29 @@ import * as THREE from 'three';
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGame } from '../../store.js';
-import { PLACES } from '../data/world.js';
 import { sfx } from '../../sfx.js';
 
 const BURSTS = 10;
 const PARTICLES = 90;
 const DURATION = 14; // 초
 const COLORS = ['#ff5e5e', '#ffd34d', '#7dffb0', '#7fd4ff', '#ff9ff3', '#ffffff', '#ffa94d'];
+
+// 동그랗게 빛나는 불꽃 입자 텍스처
+const sparkTexture = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.85)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+})();
+const fwd = new THREE.Vector3();
+const side = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
 
 export function Fireworks() {
   const bursts = useMemo(
@@ -17,7 +33,7 @@ export function Fireworks() {
         const positions = new Float32Array(PARTICLES * 3);
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const material = new THREE.PointsMaterial({ size: 0.55, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+        const material = new THREE.PointsMaterial({ size: 1.3, map: sparkTexture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
         return {
           geometry,
           material,
@@ -31,7 +47,7 @@ export function Fireworks() {
   );
   const timer = useRef(0);
 
-  useFrame((_, rawDt) => {
+  useFrame(({ camera }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     const start = useGame.getState().celebrateAt;
     const active = start && (performance.now() - start) / 1000 < DURATION;
@@ -42,7 +58,16 @@ export function Fireworks() {
       if (b) {
         sfx.play('firework');
         b.age = 0;
-        b.origin.set(PLACES.dangsan[0] + (Math.random() - 0.3) * 30, 18 + Math.random() * 12, PLACES.dangsan[2] + (Math.random() - 0.5) * 20);
+        // 플레이어가 어디에 서 있든 보이도록 카메라가 바라보는 쪽 하늘에서 터뜨림
+        camera.getWorldDirection(fwd);
+        fwd.y = 0;
+        fwd.normalize();
+        side.crossVectors(fwd, UP);
+        b.origin
+          .copy(camera.position)
+          .addScaledVector(fwd, 22 + Math.random() * 12)
+          .addScaledVector(side, (Math.random() - 0.5) * 26);
+        b.origin.y = camera.position.y + 6 + Math.random() * 7;
         b.material.color.set(COLORS[Math.floor(Math.random() * COLORS.length)]);
         for (let i = 0; i < PARTICLES; i++) {
           const u = Math.random() * 2 - 1;

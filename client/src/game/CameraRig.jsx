@@ -51,6 +51,7 @@ export function CameraRig() {
   const high = useMemo(() => new THREE.Vector3(), []);
   const ray = useMemo(() => new THREE.Raycaster(), []);
   const reach = useRef(1); // 장애물 때문에 줄어든 카메라 거리 비율 (0~1)
+  const party = useRef(0); // 불꽃놀이 중 카메라를 뒤로 빼고 낮추는 정도 (0~1)
 
   const [curve, lookCurve] = useMemo(() => {
     const end = new THREE.Vector3(player.pos.x + Math.sin(cam.yaw) * cam.dist, cam.height, player.pos.z + Math.cos(cam.yaw) * cam.dist);
@@ -144,7 +145,12 @@ export function CameraRig() {
 
     // 플레이: 3인칭 추적 카메라
     cam.yaw += getCameraTurn() * dt * 1.8;
-    tmp.set(player.pos.x + Math.sin(cam.yaw) * cam.dist, cam.height, player.pos.z + Math.cos(cam.yaw) * cam.dist);
+    // 최종 미션 불꽃놀이: 잠시 카메라를 뒤로 빼고 낮춰 하늘을 올려다보게
+    const since = (performance.now() - useGame.getState().celebrateAt) / 1000;
+    party.current = THREE.MathUtils.damp(party.current, useGame.getState().celebrateAt && since < 10 ? 1 : 0, 1.5, dt);
+    const dist = cam.dist + party.current * 5;
+    const height = cam.height - party.current * 2.2;
+    tmp.set(player.pos.x + Math.sin(cam.yaw) * dist, height, player.pos.z + Math.cos(cam.yaw) * dist);
 
     // 벽 충돌: 머리 → 카메라 방향으로 레이를 쏴서 건물/나무에 가리면 카메라를 앞으로 당김.
     // 막혔을 때는 위에서 내려다보는 자리도 시험해 더 멀리 보이는 쪽을 고릅니다.
