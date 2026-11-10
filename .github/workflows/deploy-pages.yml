@@ -33,6 +33,16 @@ jobs:
         working-directory: client
         run: npm ci
 
+      # 무중단 배포: 직전 배포들의 JS/CSS 파일을 보관해 두었다가 새 배포에도 함께 올림.
+      # GitHub Pages 는 index.html 을 최대 10분 캐시하므로, 배포 직후에도 예전 index.html 이
+      # 가리키는 예전 파일을 받을 수 있어야 플레이 중이던 학생 화면이 하얗게 되지 않음.
+      - name: Restore previous assets
+        uses: actions/cache/restore@v4
+        with:
+          path: .pages-prev-assets
+          key: pages-assets-${{ github.run_id }}
+          restore-keys: pages-assets-
+
       - name: Check Supabase settings
         env:
           SUPABASE_URL: ${{ vars.SUPABASE_URL }}
@@ -49,6 +59,22 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           VITE_SUPABASE_KEY: ${{ vars.SUPABASE_KEY }}
         run: npm run build
+
+      - name: Keep previous assets (14일)
+        run: |
+          mkdir -p .pages-prev-assets
+          find .pages-prev-assets -type f -mtime +14 -delete
+          for f in .pages-prev-assets/*; do
+            if [ -f "$f" ] && [ ! -e "client/dist/assets/$(basename "$f")" ]; then cp "$f" client/dist/assets/; fi
+          done
+          cp client/dist/assets/* .pages-prev-assets/
+          ls client/dist/assets
+
+      - name: Save assets for next deploy
+        uses: actions/cache/save@v4
+        with:
+          path: .pages-prev-assets
+          key: pages-assets-${{ github.run_id }}
 
       - uses: actions/configure-pages@v5
 

@@ -1,6 +1,8 @@
 // Supabase API 클라이언트: 브라우저가 Supabase 의 SQL 함수(ft_api_*)를 직접 호출합니다.
 // 주소와 공개 키는 빌드할 때 환경 변수로 넣습니다 (client/.env.example 참고).
 // 설정이 없거나 연결이 안 돼도 게임은 오프라인으로 계속 진행됩니다.
+import { timeoutSignal } from './compat.js';
+
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY || '';
 
@@ -23,7 +25,7 @@ async function rpc(fn, args, timeout = 6000) {
     method: 'POST',
     headers,
     body: JSON.stringify(args),
-    signal: AbortSignal.timeout(timeout),
+    signal: timeoutSignal(timeout),
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status >= 500 ? res.status : 503, json); // 설정/권한 문제는 재시도 가능한 오류로

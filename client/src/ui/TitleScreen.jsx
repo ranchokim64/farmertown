@@ -9,41 +9,55 @@ import { useQr } from './QrOverlay.jsx';
 
 const NICK_RE = /^[가-힣a-zA-Z0-9 ]{2,10}$/;
 
+// 학교 검색 (태블릿 기준)
+// - 목록은 입력칸 아래에 붙어 나오고(떠 있는 메뉴가 아님), 학교를 고를 때까지 계속 보입니다.
+//   키보드를 내리려고 바깥을 눌러도 사라지지 않아요.
+// - 검색이 안 될 때도 '직접 입력'으로 진행할 수 있어요.
 function SchoolSearch({ value, onChange }) {
   const [query, setQuery] = useState(value?.name ?? '');
-  const [results, setResults] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const reqId = useRef(0);
+  // 받은 결과는 어떤 검색어의 결과인지와 함께 보관 → 지금 검색어의 결과가 아직이면 항상 "검색 중"
+  const [res, setRes] = useState({ q: '', schools: [], failed: false });
+  const wantFirst = useRef(false); // 결과가 오기 전에 엔터를 누르면, 오자마자 첫 번째 학교 선택
+  const panel = useRef();
+  const q = query.trim();
+  const pending = !value && q.length > 0 && res.q !== q;
 
   useEffect(() => {
-    const q = query.trim();
-    if (!q || q === value?.name) {
-      setResults([]);
-      return;
-    }
-    const id = ++reqId.current;
-    setLoading(true);
+    if (!q || value) return undefined;
+    let alive = true;
     const timer = setTimeout(async () => {
       try {
         const r = await api.searchSchools(q);
-        if (id === reqId.current) setResults(r.schools);
+        if (alive) setRes({ q, schools: r.schools ?? [], failed: false });
       } catch {
-        if (id === reqId.current) setResults([]);
-      } finally {
-        if (id === reqId.current) setLoading(false);
+        if (alive) setRes({ q, schools: [], failed: true });
       }
     }, 250);
-    return () => clearTimeout(timer);
-  }, [query, value]);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [q, value]);
 
   const pick = (school) => {
+    wantFirst.current = false;
     onChange(school);
     setQuery(school.name);
-    setOpen(false);
+    sfx.play('click');
   };
 
-  const q = query.trim();
+  useEffect(() => {
+    if (res.q !== q) return;
+    if (wantFirst.current && res.schools[0]) pick(res.schools[0]);
+    wantFirst.current = false;
+    // 결과가 나오면 목록이 화면(키보드 위) 안에 보이도록 스크롤
+    panel.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [res]);
+
+  const results = res.q === q ? res.schools : [];
+  const failed = res.q === q && res.failed;
+  const showPanel = !value && q.length > 0;
   return (
     <div className="school-search">
       <input
@@ -52,24 +66,42 @@ function SchoolSearch({ value, onChange }) {
         maxLength={20}
         autoComplete="off"
         enterKeyHint="search"
+        className={value ? 'picked' : ''}
         onChange={(e) => {
           setQuery(e.target.value);
-          onChange(null);
-          setOpen(true);
+          wantFirst.current = false;
+          if (value) onChange(null);
         }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => {
+          // 엔터(키보드의 "검색"): 첫 번째 학교를 선택 (폼 제출 막기)
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          if (pending) wantFirst.current = true;
+          else if (results[0]) pick(results[0]);
+        }}
+        onFocus={keepInView}
       />
-      {open && q && !value && (
-        <ul className="dropdown">
-          {loading && <li className="muted">검색 중…</li>}
+      {value && (
+        <div className="school-picked">
+          ✅ <b>{value.name}</b> {value.region && <span className="muted">{value.region}</span>}
+          <button type="button" className="link" onClick={() => { onChange(null); setQuery(''); }}>
+            다시 고르기
+          </button>
+        </div>
+      )}
+      {showPanel && (
+        <ul className="school-list" ref={panel}>
+          {pending && <li className="muted">검색 중…</li>}
+          {!pending && failed && <li className="muted">학교 검색이 잠시 안 돼요. 아래 &apos;직접 입력&apos;을 눌러 주세요.</li>}
+          {!pending && !failed && !results.length && q.length < 2 && <li className="muted">학교 이름을 두 글자 이상 써 주세요</li>}
+          {!pending && !failed && !results.length && q.length >= 2 && <li className="muted">찾는 학교가 없어요. 이름을 다시 확인하거나 아래 &apos;직접 입력&apos;을 눌러 주세요.</li>}
           {results.map((s) => (
-            <li key={s.code} onMouseDown={() => pick(s)}>
+            <li key={s.code} role="button" onClick={() => pick(s)}>
               <b>{s.name}</b> <span className="muted">{s.region}</span>
             </li>
           ))}
-          {!loading && q.length >= 2 && (
-            <li className="custom" onMouseDown={() => pick({ code: '', name: q, region: '직접 입력' })}>
+          {!pending && q.length >= 2 && (
+            <li className="custom" role="button" onClick={() => pick({ code: '', name: q, region: '직접 입력' })}>
               ✏️ &quot;{q}&quot; (으)로 직접 입력하기
             </li>
           )}
@@ -77,6 +109,32 @@ function SchoolSearch({ value, onChange }) {
       )}
     </div>
   );
+}
+
+// 입력칸을 누르면 화면 키보드가 올라온 뒤 입력칸이 가려지지 않게 스크롤
+function keepInView(e) {
+  const el = e.currentTarget;
+  setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 350);
+}
+
+// 화면 키보드 높이만큼 타이틀 화면 아래에 여백을 줘서, 가려진 부분까지 스크롤할 수 있게 함
+// (키보드가 화면을 줄이지 않고 덮는 브라우저 대비)
+function useKeyboardInset(ref) {
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    const update = () => {
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      ref.current?.style.setProperty('--kb', `${Math.round(kb)}px`);
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [ref]);
 }
 
 // 터치 기기를 세로로 들고 있는지
@@ -102,11 +160,13 @@ export function TitleScreen() {
   const [busy, setBusy] = useState(false);
   const canResume = !!(sessionId && profile);
   const portrait = usePortrait();
+  const screen = useRef();
+  useKeyboardInset(screen);
 
   const join = async (e) => {
     e.preventDefault();
     setError('');
-    if (!school) return sfx.play('hint'), setError('학교를 검색해서 선택해 주세요.');
+    if (!school) return sfx.play('hint'), setError('학교 이름을 쓰고 아래 목록에서 우리 학교를 눌러 주세요.');
     if (!NICK_RE.test(nickname.trim())) return sfx.play('hint'), setError('닉네임은 한글·영문·숫자 2~10자로 지어 주세요.');
     setBusy(true);
     if (isTouchDevice) enterFullscreen(); // 태블릿: 주소창을 숨겨 화면을 넓게 (버튼을 누른 순간에만 가능)
@@ -133,7 +193,7 @@ export function TitleScreen() {
   };
 
   return (
-    <div className="title-screen">
+    <div className="title-screen" ref={screen}>
       <div className="title-card">
         <div className="badge">11월 11일 농업인의 날</div>
         <h1>
@@ -169,6 +229,7 @@ export function TitleScreen() {
               maxLength={10}
               autoComplete="off"
               enterKeyHint="go"
+              onFocus={keepInView}
             />
             <div className="outfit">
               <div>

@@ -7,6 +7,8 @@ export default defineConfig({
   base: process.env.VITE_BASE || '/',
   server: { host: true },
   build: {
+    // 학교 태블릿의 오래된 브라우저(크롬 87·삼성 인터넷 14 이상)까지 동작하도록 문법을 맞춤
+    target: ['es2020', 'chrome87', 'safari14', 'firefox78', 'edge88'],
     chunkSizeWarningLimit: 1500,
   },
 });

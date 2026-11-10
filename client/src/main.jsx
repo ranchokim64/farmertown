@@ -3,6 +3,13 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import './styles.css';
 
+// 화면 파일을 정상으로 받았으니 새로고침 표시 지움 (index.html 의 무중단 배포 보조 참고)
+try {
+  sessionStorage.removeItem('ft-reloaded');
+} catch {
+  /* 무시 */
+}
+
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />

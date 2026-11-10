@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { api, ApiError } from './api.js';
 import { MAIN_QUESTS, QUESTS, QUEST_START_ITEMS } from './game/data/quests.js';
 import { sfx } from './sfx.js';
+import { uuid } from './compat.js';
 import { music } from './music.js';
 
 const STORAGE_KEY = 'farmertown:v1';
@@ -52,7 +53,7 @@ export const useGame = create((set, get) => ({
 
   // 새 게임 시작: 서버 세션 생성 (실패해도 오프라인으로 진행)
   startNew: async ({ nickname, school, outfit }) => {
-    const sessionId = crypto.randomUUID();
+    const sessionId = uuid();
     try {
       const s = await api.createSession(sessionId, nickname, school);
       set({ online: true, serverScore: s.score });

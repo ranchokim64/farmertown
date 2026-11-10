@@ -10,6 +10,18 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌾</text></svg>" />
+    <script>
+      // 무중단 배포 보조: 새 버전이 올라간 직후 예전 화면 파일을 못 받으면 한 번만 새로고침해 새 버전을 받음
+      window.addEventListener('error', function (e) {
+        var t = e.target, url = t && (t.src || t.href);
+        if (!url || !/\/assets\//.test(url)) return;
+        try {
+          if (sessionStorage.getItem('ft-reloaded')) return;
+          sessionStorage.setItem('ft-reloaded', '1');
+        } catch (err) { return; }
+        location.reload();
+      }, true);
+    </script>
   </head>
   <body>
     <div id="root"></div>
