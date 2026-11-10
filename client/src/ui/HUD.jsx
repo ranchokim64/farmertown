@@ -4,6 +4,8 @@ import { QUESTS, ITEMS, currentQuest } from '../game/data/quests.js';
 import { joystick, fireInteract } from '../game/input.js';
 import { SoundToggles } from './SoundToggles.jsx';
 import { TutorialBanner } from './TutorialBanner.jsx';
+import { richText } from './richText.jsx';
+import { useLearnNote } from './LearnNote.jsx';
 
 function QuestLog() {
   const progress = useGame((s) => s.progress);
@@ -19,6 +21,14 @@ function QuestLog() {
       <button className="panel-head" onClick={() => setOpen(!open)}>
         📜 축제 미션 <b>{doneCount}/6</b> <span className="muted">{open ? '▲' : '▼'}</span>
       </button>
+      {tutorial === 'done' && (
+        <div className="quest-tools">
+          <button onClick={useLearnNote.getState().show}>📒 배움 노트</button>
+          <button className="ghost" onClick={confirmRestart}>
+            ↺ 처음부터
+          </button>
+        </div>
+      )}
       {open && (
         <ol>
           {QUESTS.map((q, n) => {
@@ -48,6 +58,15 @@ function QuestLog() {
       )}
     </div>
   );
+}
+
+function confirmRestart() {
+  if (
+    window.confirm(
+      '처음부터 다시 할까요?\n\n진행 상황(미션·리본)만 처음으로 돌아가요.\n우리 학교 점수와 클리어 기록은 그대로예요. (다시 깨도 점수는 더해지지 않아요)',
+    )
+  )
+    useGame.getState().restartProgress();
 }
 
 function SchoolPanel() {
@@ -96,7 +115,7 @@ function Dialog() {
   return (
     <div className="dialog" onClick={advance}>
       <div className="speaker">{dialog.speaker}</div>
-      <p>{dialog.lines[dialog.index]}</p>
+      <p>{richText(dialog.lines[dialog.index])}</p>
       <div className="next">{last ? '닫기' : '다음'} ▶ <span className="muted">(E / 스페이스 / 터치)</span></div>
     </div>
   );

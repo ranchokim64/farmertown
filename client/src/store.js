@@ -4,6 +4,7 @@ import { MAIN_QUESTS, QUESTS, QUEST_START_ITEMS } from './game/data/quests.js';
 import { sfx } from './sfx.js';
 import { uuid } from './compat.js';
 import { music } from './music.js';
+import { resetPlayer } from './game/runtime.js';
 
 const STORAGE_KEY = 'farmertown:v1';
 
@@ -78,12 +79,12 @@ export const useGame = create((set, get) => ({
     const { sessionId, progress } = get();
     try {
       const s = await api.getSession(sessionId);
-      const completed = [...new Set([...progress.completed, ...s.completed])];
-      const pending = completed.filter((q) => !s.completed.includes(q));
+      // 서버 기록을 로컬 진행에 합치지 않음: '처음부터 다시하기'로 지운 진행이 새로고침 때 되살아나지 않게.
+      // 로컬에서 끝냈지만 서버에 아직 없는 미션만 다시 보냄.
+      const pending = progress.completed.filter((q) => !s.completed.includes(q));
       set({
         online: true,
         serverScore: s.score,
-        progress: { ...progress, completed },
         pending: sortQuests(pending),
         clearInfo: s.clearTimeMs ? { timeMs: s.clearTimeMs } : null,
       });
@@ -107,6 +108,23 @@ export const useGame = create((set, get) => ({
     } catch {
       set({ online: false });
     }
+  },
+
+  // ↺ 처음부터 다시하기: 닉네임·학교·세션은 그대로, 진행만 처음으로.
+  // 서버는 이미 끝낸 미션에 다시 점수를 주지 않으므로(멱등) 학교 점수와 클리어 기록은 그대로 남음.
+  restartProgress: () => {
+    const replays = (get().progress.replays ?? 0) + 1;
+    set({
+      progress: { ...emptyProgress(), tutorial: 'done', replays },
+      pending: [],
+      dialog: null,
+      prompt: null,
+      showClear: false,
+      celebrateAt: 0,
+      tutorialFlash: null,
+    });
+    resetPlayer();
+    get().toast('↺ 처음부터 다시 시작해요! (학교 점수와 클리어 기록은 그대로예요)');
   },
 
   resetAll: () => {
@@ -150,7 +168,7 @@ export const useGame = create((set, get) => ({
       setTimeout(() => set({ showClear: true }), 4500);
     } else {
       const n = MAIN_QUESTS.filter((q) => completed.includes(q)).length;
-      get().toast(`🎀 감사 리본 ${n}/5`);
+      get().toast(`🎀 감사 리본 ${n}/5 · 📒 배움 노트에 적었어요`);
     }
     get().flushPending();
   },

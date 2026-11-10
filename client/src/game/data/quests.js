@@ -1,7 +1,7 @@
 // 퀘스트 진행 규칙. 미션은 차례대로 열리고, 각 미션은 맡기는 NPC 와 이야기해야 시작됩니다.
 // 대사는 story.js 에 있습니다.
 import { PLACES, WEEDY_PADDIES, ELDERS } from './world.js';
-import { CHIEF_NAME, NPCS, STORY, STEP_GUIDE, greetLines, missionLines, chiefHintLines } from './story.js';
+import { CHIEF_NAME, NPCS, STORY, STEP_GUIDE, LEARN, recapLines, greetLines, missionLines, chiefHintLines } from './story.js';
 
 // ── 아이템 ───────────────────────────────────────────
 export const ITEMS = {
@@ -212,7 +212,7 @@ export const INTERACTABLES = [
     interact: (ctx) => {
       const r = questGiverTalk(ctx, 'farmer', ['snail', 'scarecrow']);
       if (r === true) return;
-      if (r === null) return ctx.say('농부 아저씨', STORY.scarecrow.farmerAfter);
+      if (r === null) return ctx.say('농부 아저씨', [...recapLines('snail'), ...LEARN.scarecrow.lines, STORY.scarecrow.farmerAfter[1]]);
       const p = ctx.p;
       if (currentQuest(p) === 'snail') return ctx.say('농부 아저씨', STORY.snail.remind(3 - WEEDY_PADDIES.filter((w) => flag(p, w.id)).length));
       const need = ['straw_hat', 'old_shirt'].filter((id) => !has(p, id) && !flag(p, id)).map((id) => ITEMS[id].name);
@@ -265,7 +265,7 @@ export const INTERACTABLES = [
     interact: (ctx) => {
       const r = questGiverTalk(ctx, 'miller', ['tteok']);
       if (r === true) return;
-      ctx.say('방앗간 주인', r === null ? STORY.tteok.millerAfter : STORY.tteok.remind);
+      ctx.say('방앗간 주인', r === null ? [...recapLines('tteok'), STORY.tteok.millerAfter[1]] : STORY.tteok.remind);
     },
   },
   ...ELDERS.map((e) =>
@@ -300,7 +300,7 @@ export const INTERACTABLES = [
     interact: (ctx) => {
       const r = questGiverTalk(ctx, 'youngFarmer', ['smartfarm']);
       if (r === true) return;
-      ctx.say('청년 농부', r === null ? STORY.smartfarm.after : STORY.smartfarm.remind);
+      ctx.say('청년 농부', r === null ? [...recapLines('smartfarm'), STORY.smartfarm.after[1]] : STORY.smartfarm.remind);
     },
   },
   questTarget('smartfarm', {
@@ -375,14 +375,35 @@ export const INTERACTABLES = [
     active: () => true,
     guide: () => false,
     label: () => '대화하기 · 개구리 개굴이',
-    interact: (ctx) =>
+    interact: (ctx) => {
+      ctx.setFlag('met_frog'); // 배움 노트 보너스 공개
       ctx.say('개구리 개굴이', [
         '개굴! 논은 쌀만 키우는 게 아니야.',
-        '비가 많이 오면 물을 가둬 홍수를 막고, 나 같은 개구리와 여러 생물의 집이 되어 준다구!',
-        '쌀 한 톨이 밥상에 오르기까지 농부님 손길이 여든여덟 번 간대. 그래서 쌀 미(米) 자에 八十八이 숨어 있지! 개굴~',
-      ]),
+        '비가 많이 오면 물을 가둬 **홍수**를 막고, 나 같은 개구리와 여러 **생물**의 집이 되어 준다구!',
+        '쌀 한 톨이 밥상에 오르기까지 농부님 손길이 여든여덟 번 간대. 그래서 쌀 미(米) 자에 **八十八**이 숨어 있지! 개굴~',
+        '📒 배움 노트에 적어 두었어. 개굴!',
+      ]);
+    },
   },
 ];
+
+// 끝낸 미션: 그 장소에서 배운 내용을 다시 들려줌 (📒 배움 노트와 같은 내용)
+const recapTarget = (q, id, pos, radius, label) => ({
+  id: `recap_${id}`,
+  pos,
+  radius,
+  active: (p) => p.completed.includes(q),
+  guide: () => false,
+  label: () => `다시 듣기 · ${label}`,
+  interact: (ctx) => ctx.say(label, recapLines(q)),
+});
+
+INTERACTABLES.push(
+  recapTarget('soil', 'tablet', PLACES.tablet, 2.6, '비석의 비밀'),
+  recapTarget('scarecrow', 'scarecrow', PLACES.scarecrow, 2.8, '허수아비'),
+  recapTarget('smartfarm', 'console', [PLACES.console[0], 0, PLACES.console[2] + 1.6], 2.4, '스마트팜 콘솔'),
+  recapTarget('final', 'dangsan', [PLACES.dangsan[0] + 2.2, 0, PLACES.dangsan[2] + 2.2], 3.2, '당산나무'),
+);
 
 // 길안내 화살표가 가리킬 대상: 미션을 아직 안 맡았으면 맡길 NPC, 맡았으면 그 미션의 다음 목표
 export function isGuideTarget(it, p) {

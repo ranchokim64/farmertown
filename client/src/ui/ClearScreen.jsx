@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useGame } from '../store.js';
+import { useLearnNote } from './LearnNote.jsx';
 
 export function formatTime(ms) {
   if (ms == null) return '-';
@@ -10,6 +11,7 @@ export function formatTime(ms) {
 
 export function ClearScreen() {
   const { clearInfo, leaderboard, profile, closeClear, refreshLeaderboard } = useGame();
+  const replay = useGame((s) => (s.progress.replays ?? 0) > 0);
   useEffect(() => {
     refreshLeaderboard();
   }, [refreshLeaderboard]);
@@ -21,7 +23,11 @@ export function ClearScreen() {
         <h2>황금 들판 감사 트리 완성!</h2>
         <p>
           <b>{profile?.nickname}</b> 농부님, 수고했어요! <br />
-          우리 학교에 <b>+100점</b>을 보탰어요.
+          {replay ? '다시 하기도 완료! (학교 점수는 처음 깼을 때 이미 더해졌어요)' : (
+            <>
+              우리 학교에 <b>+100점</b>을 보탰어요.
+            </>
+          )}
         </p>
         <div className="record">
           ⏱ 클리어 기록 <b>{formatTime(clearInfo?.timeMs)}</b>
@@ -58,9 +64,14 @@ export function ClearScreen() {
           </div>
         </div>
         <p className="muted">농업인 여러분, 맛있는 쌀을 길러 주셔서 고맙습니다! 🍚</p>
+        <div className="clear-actions">
+          <button className="btn ghost-strong" onClick={() => { closeClear(); useLearnNote.getState().show(); }}>
+            📒 배움 노트 보기
+          </button>
         <button className="btn primary" onClick={closeClear}>
           마을 계속 둘러보기
         </button>
+        </div>
       </div>
     </div>
   );
