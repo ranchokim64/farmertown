@@ -57,9 +57,9 @@ export function Player() {
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
-    const { phase, dialog } = useGame.getState();
+    const { phase, dialog, quiz } = useGame.getState();
     let moving = false;
-    if (phase === 'play' && !dialog) {
+    if (phase === 'play' && !dialog && !quiz) {
       const { forward, right, run } = getMoveInput();
       if (Math.abs(forward) + Math.abs(right) > 0.05) {
         // 카메라 기준 방향 → 월드 방향

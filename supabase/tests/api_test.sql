@@ -42,6 +42,7 @@ select pg_temp.ok(ft_api_create_session(:'sid', '다른이름', '', '다른학�
 
 -- 퀘스트
 select pg_temp.ok(ft_api_complete(:'sid', 'final') ->> 'status' = '409', '리본 5개 전 최종 퀘스트 거부');
+select pg_temp.ok(ft_api_final_quiz(:'sid', '12120') ->> 'status' = '409', '최종 미션 전 보너스 퀴즈 거부');
 select pg_temp.ok(ft_api_complete(:'sid', 'hack') ->> 'status' = '400', '알 수 없는 퀘스트 거부');
 select pg_temp.ok(ft_api_complete(:'sid', 'soil') ->> 'added' = '10', '퀘스트 +10점');
 select pg_temp.ok(ft_api_complete(:'sid', 'snail') ->> 'status' = '429', '연속 요청 쿨타임');
@@ -60,9 +61,20 @@ select ft_api_complete(:'sid', 'final') as fin \gset
 select pg_temp.ok((:'fin'::jsonb) ->> 'added' = '50' and (:'fin'::jsonb) ->> 'score' = '100', '최종 +50점, 총 100점');
 select pg_temp.ok(((:'fin'::jsonb) ->> 'speedRank')::int >= 1 and ((:'fin'::jsonb) ->> 'clearTimeMs')::int >= 0, '클리어 기록과 순위');
 
+-- 최종 보너스 퀴즈
+select pg_sleep(0.25) \g /dev/null
+select pg_temp.ok(ft_api_final_quiz(:'sid', '00000') ->> 'passed' = 'false' and ft_api_final_quiz(:'sid', '00000') ->> 'added' = '0', '보너스 퀴즈 오답은 0점');
+select ft_api_final_quiz(:'sid', '12120') as qz \gset
+select pg_temp.ok((:'qz'::jsonb) ->> 'added' = '20' and (:'qz'::jsonb) ->> 'score' = '120' and (:'qz'::jsonb) ->> 'passed' = 'true', '보너스 퀴즈 +20점, 총 120점');
+select pg_temp.ok((:'qz'::jsonb) -> 'completed' ->> -1 = 'quiz', '완료 기록 맨 끝에 quiz');
+select pg_sleep(0.25) \g /dev/null
+select pg_temp.ok(ft_api_final_quiz(:'sid', '12120') ->> 'added' = '0', '보너스 퀴즈 재통과는 0점');
+select pg_temp.ok(ft_api_complete(:'sid', 'quiz') ->> 'status' = '400', '보너스는 일반 완료 API 로 못 받음');
+select pg_temp.ok(has_function_privilege('anon', 'ft_api_final_quiz(text,text)', 'execute'), 'anon 은 보너스 퀴즈 API 호출 가능');
+
 -- 랭킹
 select ft_api_leaderboard(5, 'demo:haetsal') as lb \gset
-select pg_temp.ok(((:'lb'::jsonb) -> 'mySchool' ->> 'score')::int >= 100, '학교 점수 합산');
+select pg_temp.ok(((:'lb'::jsonb) -> 'mySchool' ->> 'score')::int >= 120, '학교 점수 합산');
 select pg_temp.ok(exists (select 1 from jsonb_array_elements((:'lb'::jsonb) -> 'speedrun') e where e ->> 'nickname' = '꼬마 농부'), '명예의 전당');
 
 -- 최소 소요 시간 (매크로 방지)

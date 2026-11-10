@@ -12,6 +12,7 @@ export function formatTime(ms) {
 export function ClearScreen() {
   const { clearInfo, leaderboard, profile, closeClear, refreshLeaderboard } = useGame();
   const replay = useGame((s) => (s.progress.replays ?? 0) > 0);
+  const quizPassed = useGame((s) => !!s.progress.flags.quiz_passed);
   useEffect(() => {
     refreshLeaderboard();
   }, [refreshLeaderboard]);
@@ -64,13 +65,18 @@ export function ClearScreen() {
           </div>
         </div>
         <p className="muted">농업인 여러분, 맛있는 쌀을 길러 주셔서 고맙습니다! 🍚</p>
+        {!quizPassed && (
+          <button className="btn primary big quiz-cta" onClick={() => { closeClear(); useGame.getState().openQuiz({ kind: 'final' }); }}>
+            🏆 보너스 퀴즈 도전! (5문제 모두 맞히면 +20점)
+          </button>
+        )}
         <div className="clear-actions">
           <button className="btn ghost-strong" onClick={() => { closeClear(); useLearnNote.getState().show(); }}>
             📒 배움 노트 보기
           </button>
-        <button className="btn primary" onClick={closeClear}>
-          마을 계속 둘러보기
-        </button>
+          <button className="btn primary" onClick={closeClear}>
+            마을 계속 둘러보기
+          </button>
         </div>
       </div>
     </div>

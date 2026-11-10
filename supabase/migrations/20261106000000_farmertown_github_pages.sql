@@ -166,6 +166,7 @@ alter table ft_config enable row level security;
 insert into ft_config (key, value) values
   ('points_quest', '10'),               -- 퀘스트 1개당 학교 점수
   ('points_final', '50'),               -- 최종 엔딩 점수
+  ('points_quiz', '20'),                -- 최종 보너스 퀴즈(5문제 모두 정답) 점수
   ('quest_cooldown_ms', '3000'),        -- 같은 세션의 퀘스트 완료 요청 최소 간격
   ('min_ms_per_quest', '8000'),         -- n번째 퀘스트는 시작 후 n × 이 값 이후에만 인정 (매크로 방지)
   ('rl_ip_per_min', '1200'),            -- IP 당 분당 API 호출 (학교는 IP 하나를 공유하므로 넉넉하게)
@@ -258,7 +259,7 @@ language sql stable as $$
     'score', s.score,
     'clearTimeMs', s.clear_time_ms,
     'completed', coalesce((
-      select jsonb_agg(q.quest_id order by array_position(array['soil', 'snail', 'scarecrow', 'tteok', 'smartfarm', 'final'], q.quest_id))
+      select jsonb_agg(q.quest_id order by array_position(array['soil', 'snail', 'scarecrow', 'tteok', 'smartfarm', 'final', 'quiz'], q.quest_id))
       from ft_session_quests q where q.session_id = s.id
     ), '[]'::jsonb)
   )
@@ -460,6 +461,47 @@ begin
   return v_res;
 end $$;
 
+-- 최종 보너스 퀴즈: 5문제 정답 키가 맞으면 학교 점수 +points_quiz (세션당 1번, 'quiz' 완료 기록으로 멱등)
+-- 정답 키는 client/src/game/data/story.js 의 QUIZ.final 정답 순서(FINAL_QUIZ_KEY)와 같아야 합니다.
+create or replace function ft_api_final_quiz(p_session text, p_answers text)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare
+  c_key constant text := '12120';
+  v_lim jsonb;
+  v_id uuid;
+  s jsonb;
+  v_points int;
+  r record;
+begin
+  v_lim := ft_limited('ip:' || ft_client_ip(), ft_cfg_int('rl_ip_per_min', 1200));
+  if v_lim is not null then return v_lim; end if;
+  if coalesce(p_session, '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' then
+    return ft_err(404, 'NO_SESSION', '세션을 찾을 수 없어요.');
+  end if;
+  v_id := p_session::uuid;
+  v_lim := ft_limited('sess:' || p_session, ft_cfg_int('rl_session_per_min', 60));
+  if v_lim is not null then return v_lim; end if;
+
+  s := ft_session_json(v_id);
+  if s is null then return ft_err(404, 'NO_SESSION', '세션을 찾을 수 없어요.'); end if;
+  if not (s -> 'completed' ? 'final') then
+    return ft_err(409, 'NOT_READY', '최종 미션을 먼저 끝내야 해요.');
+  end if;
+  if coalesce(p_answers, '') <> c_key then
+    return s || jsonb_build_object('added', 0, 'passed', false);
+  end if;
+  if s -> 'completed' ? 'quiz' then return s || jsonb_build_object('added', 0, 'passed', true); end if; -- 멱등 처리
+
+  select * into r from ft_cooldown('cd:quest:' || v_id, ft_cfg_int('quest_cooldown_ms', 3000));
+  if not r.allowed then
+    return ft_err(429, 'RATE_LIMITED', '조금만 천천히! 잠시 후 다시 시도해 주세요.', r.retry_after_ms);
+  end if;
+
+  v_points := ft_cfg_int('points_quiz', 20);
+  select * into r from ft_complete_quest(v_id, 'quiz', v_points, false);
+  return ft_session_json(v_id) || jsonb_build_object('added', case when r.added then v_points else 0 end, 'passed', true);
+end $$;
+
 create or replace function ft_api_leaderboard(p_limit int default 5, p_school text default null)
 returns jsonb language plpgsql security definer set search_path = public, extensions as $$
 declare
@@ -503,14 +545,14 @@ begin
 end $$;
 
 -- ── 권한 ──────────────────────────────────────────────
--- 내부 함수와 테이블은 누구도 직접 못 쓰게, API 함수 5개만 공개
+-- 내부 함수와 테이블은 누구도 직접 못 쓰게, API 함수 6개만 공개
 revoke all on ft_sessions, ft_session_quests, ft_schools, ft_rate_limits, ft_cache, ft_config from public;
 revoke execute on function
   ft_rate_hit(text, int, int), ft_cooldown(text, int), ft_complete_quest(uuid, text, int, boolean),
   ft_cfg(text), ft_cfg_int(text, int), ft_client_ip(), ft_err(int, text, text, int), ft_limited(text, int, int),
   ft_has_profanity(text), ft_sample_schools(), ft_session_json(uuid),
   ft_api_search_schools(text), ft_api_create_session(text, text, text, text), ft_api_get_session(text),
-  ft_api_complete(text, text), ft_api_leaderboard(int, text)
+  ft_api_complete(text, text), ft_api_final_quiz(text, text), ft_api_leaderboard(int, text)
 from public;
 
 do $$
@@ -524,7 +566,7 @@ begin
     from anon, authenticated;
     grant execute on function
       ft_api_search_schools(text), ft_api_create_session(text, text, text, text), ft_api_get_session(text),
-      ft_api_complete(text, text), ft_api_leaderboard(int, text)
+      ft_api_complete(text, text), ft_api_final_quiz(text, text), ft_api_leaderboard(int, text)
     to anon, authenticated;
   end if;
 end $$;

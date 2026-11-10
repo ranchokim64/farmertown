@@ -139,7 +139,8 @@ export const QUESTS = [
 // ── 상호작용 대상 ────────────────────────────────────
 // quest: 이 대상이 속한 미션 (그 미션이 진행 중일 때만 [E] 가 뜨고 화살표가 가리킴)
 // active(p): 상호작용 가능 여부 / guide(p): 길안내 화살표 대상 여부
-// interact(ctx): ctx = { p, nickname, pick, take, setFlag, complete, say, hint, sfx, toast, startQuest, setTutorial, finishTutorial }
+// interact(ctx): ctx = { p, nickname, pick, take, setFlag, complete, finish, say, hint, sfx, toast, startQuest, setTutorial, finishTutorial, openFinalQuiz }
+//   finish(q, 말하는이, 완료대사, 리본전처리, 다음안내) = 완료 대사 → OX 퀴즈 → 맞히면 처리 + complete + 다음 NPC 안내
 
 // 미션 대상: 자기 미션이 진행 중일 때만 활성
 const questTarget = (q, it) => ({
@@ -195,9 +196,8 @@ export const INTERACTABLES = [
     interact: (ctx) => {
       const have = HANJA.filter((id) => has(ctx.p, id)).length;
       if (have < 4) return ctx.hint('부서진 비석', STORY.soil.remindTablet(have));
-      ctx.take(HANJA);
-      ctx.complete('soil');
-      ctx.say('비석의 비밀', STORY.soil.done);
+      // 완료 대사 → 확인 퀴즈 → 맞히면 리본 (퀴즈 전에는 아무것도 바꾸지 않아 새로고침해도 다시 이어짐)
+      ctx.finish('soil', '비석의 비밀', STORY.soil.done, () => ctx.take(HANJA), STORY.soil.next);
     },
   }),
 
@@ -228,13 +228,16 @@ export const INTERACTABLES = [
       guide: (p) => !flag(p, w.id),
       label: () => '우렁이 풀어주기 · 잡초 논',
       interact: (ctx) => {
-        ctx.setFlag(w.id);
         ctx.sfx('splash');
         const done = WEEDY_PADDIES.filter((x) => x.id === w.id || flag(ctx.p, x.id)).length;
-        if (done < 3) return ctx.toast(`🐌 우렁이 출동! (${done}/3)`);
-        ctx.take(['snail_basket']);
-        ctx.complete('snail');
-        ctx.say('우렁이 특공대', STORY.snail.done);
+        if (done < 3) {
+          ctx.setFlag(w.id);
+          return ctx.toast(`🐌 우렁이 출동! (${done}/3)`);
+        }
+        ctx.finish('snail', '우렁이 특공대', STORY.snail.done, () => {
+          ctx.setFlag(w.id);
+          ctx.take(['snail_basket']);
+        }, STORY.snail.next);
       },
     }),
   ),
@@ -248,9 +251,7 @@ export const INTERACTABLES = [
     interact: (ctx) => {
       const need = ['straw_hat', 'old_shirt'].filter((id) => !has(ctx.p, id));
       if (need.length) return ctx.hint('허수아비 뼈대', STORY.scarecrow.remindScarecrow(need.map((id) => ITEMS[id].name).join('와 ')));
-      ctx.take(['straw_hat', 'old_shirt']);
-      ctx.complete('scarecrow');
-      ctx.say('허수아비', STORY.scarecrow.done);
+      ctx.finish('scarecrow', '허수아비', STORY.scarecrow.done, () => ctx.take(['straw_hat', 'old_shirt']), STORY.scarecrow.next);
     },
   }),
 
@@ -278,13 +279,17 @@ export const INTERACTABLES = [
       label: () => `배달하기 · ${e.name}`,
       interact: (ctx) => {
         if (!has(ctx.p, e.want)) return ctx.hint(e.name, STORY.tteok.elderWrong(ITEMS[e.want].name));
-        ctx.take([e.want]);
-        ctx.setFlag(e.id);
         ctx.sfx('deliver');
         const done = ELDERS.filter((x) => x.id === e.id || flag(ctx.p, x.id)).length;
-        if (done < 3) return ctx.say(e.name, STORY.tteok.elderThanks(done));
-        ctx.complete('tteok');
-        ctx.say(e.name, STORY.tteok.done);
+        if (done < 3) {
+          ctx.take([e.want]);
+          ctx.setFlag(e.id);
+          return ctx.say(e.name, STORY.tteok.elderThanks(done));
+        }
+        ctx.finish('tteok', e.name, STORY.tteok.done, () => {
+          ctx.take([e.want]);
+          ctx.setFlag(e.id);
+        }, STORY.tteok.next);
       },
     }),
   ),
@@ -312,9 +317,7 @@ export const INTERACTABLES = [
     label: () => '센서 장착하기 · 스마트팜 콘솔',
     interact: (ctx) => {
       if (!has(ctx.p, 'sensor')) return ctx.hint('스마트팜 콘솔', STORY.smartfarm.remindConsole);
-      ctx.take(['sensor']);
-      ctx.complete('smartfarm');
-      ctx.say('스마트팜 콘솔', STORY.smartfarm.done);
+      ctx.finish('smartfarm', '스마트팜 콘솔', STORY.smartfarm.done, () => ctx.take(['sensor']), STORY.smartfarm.next);
     },
   }),
 
@@ -349,6 +352,10 @@ export const INTERACTABLES = [
       const cur = currentQuest(p);
       if (cur === 'final' && !questStarted(p, 'final')) return ctx.say(CHIEF_NAME, STORY.final.start, 'talk', () => ctx.startQuest('final'));
       if (cur === 'final') return ctx.say(CHIEF_NAME, STORY.final.remind);
+      if (!cur && !flag(p, 'quiz_passed')) {
+        return ctx.say(CHIEF_NAME, [...STORY.final.after, '🏆 그런데 보너스 퀴즈에 도전해 보겠니? 5문제를 모두 맞히면 우리 학교 점수가 20점 더 올라간단다!'], 'talk', () => ctx.openFinalQuiz());
+      }
+      if (!cur) return ctx.say(CHIEF_NAME, [...STORY.final.after, '보너스 퀴즈까지 모두 맞혔구나. 정말 훌륭하다! 🏆']);
       ctx.say(CHIEF_NAME, chiefHintLines({ current: cur, started: cur && questStarted(p, cur), giver: cur && QUEST_GIVER[cur], ribbons: ribbonsOf(p) }));
     },
   },

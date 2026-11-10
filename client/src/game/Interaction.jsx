@@ -26,7 +26,7 @@ function nearest(p, filter, maxDist) {
 
 export function interactNow() {
   const s = useGame.getState();
-  if (s.phase !== 'play') return;
+  if (s.phase !== 'play' || s.quiz) return;
   if (s.dialog) return s.advanceDialog();
   // 프레임마다 캐시한 대상은 이미 처리됐을 수 있으므로 누르는 순간 다시 계산
   const current = nearest(s.progress, (it) => it.active(s.progress), 99)?.it;
@@ -45,6 +45,21 @@ export function interactNow() {
     hint: (speaker, lines) => s.say(speaker, lines, 'hint'),
     sfx: sfx.play,
     toast: s.toast,
+    // 완료 대사 → OX 퀴즈 → 맞히면 마무리 처리 + 리본 + 다음 NPC 안내
+    finish: (q, speaker, doneLines, apply, nextLines) =>
+      s.say(speaker, doneLines, 'talk', () =>
+        useGame.getState().openQuiz({
+          kind: 'ox',
+          q,
+          onPass: () => {
+            const g = useGame.getState();
+            apply?.();
+            g.complete(q);
+            g.say(speaker, nextLines);
+          },
+        }),
+      ),
+    openFinalQuiz: () => useGame.getState().openQuiz({ kind: 'final' }),
   });
   // 튜토리얼 '말 걸기' 단계: 참새와의 대화를 끝까지 읽으면 통과
   if (s.progress.tutorial === 'talk' && current.id === 'sparrowGuide') {
@@ -66,7 +81,7 @@ export function InteractionSystem() {
       acc.current = 0;
       const p = s.progress;
       const near = s.phase === 'play' ? nearest(p, (it) => it.active(p), 99) : null;
-      s.setPrompt(near && !s.dialog ? near.it.label(p) : null);
+      s.setPrompt(near && !s.dialog && !s.quiz ? near.it.label(p) : null);
       const step = p.tutorial ?? 'done';
       const guideFilter =
         step === 'done' ? (it) => isGuideTarget(it, p)

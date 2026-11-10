@@ -45,5 +45,6 @@ export const api = {
     }),
   getSession: (id) => rpc('ft_api_get_session', { p_session: id }),
   complete: (id, questId) => rpc('ft_api_complete', { p_session: id, p_quest: questId }),
+  finalQuiz: (id, answers) => rpc('ft_api_final_quiz', { p_session: id, p_answers: answers }),
   leaderboard: (schoolCode) => rpc('ft_api_leaderboard', { p_limit: 5, p_school: schoolCode || null }),
 };

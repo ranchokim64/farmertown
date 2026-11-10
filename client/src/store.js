@@ -3,6 +3,7 @@ import { api, ApiError } from './api.js';
 import { MAIN_QUESTS, QUESTS, QUEST_START_ITEMS } from './game/data/quests.js';
 import { sfx } from './sfx.js';
 import { uuid } from './compat.js';
+import { FINAL_QUIZ_KEY } from './game/data/story.js';
 import { music } from './music.js';
 import { resetPlayer } from './game/runtime.js';
 
@@ -43,6 +44,7 @@ export const useGame = create((set, get) => ({
   serverScore: null,
   leaderboard: null,
   dialog: null, // { speaker, lines, index, onClose }
+  quiz: null, // { kind: 'ox'|'final', q?, onPass? } — 열려 있는 동안 이동·E 잠금
   tutorialFlash: null, // 튜토리얼 단계 완료 순간의 "잘했어요!" 표시 { at }
   toasts: [],
   prompt: null, // 현재 상호작용 안내 문구
@@ -92,7 +94,8 @@ export const useGame = create((set, get) => ({
       if (err instanceof ApiError && err.status === 404) {
         // 서버에 세션이 없으면(서버 초기화 등) 같은 UUID 로 다시 등록하고 완료 기록을 재전송
         await get().reRegister();
-        set({ pending: sortQuests(get().progress.completed) });
+        const all = [...get().progress.completed, ...(get().progress.flags.quiz_passed ? ['quiz'] : [])];
+        set({ pending: sortQuests(all) });
       } else {
         set({ online: false });
       }
@@ -118,6 +121,7 @@ export const useGame = create((set, get) => ({
       progress: { ...emptyProgress(), tutorial: 'done', replays },
       pending: [],
       dialog: null,
+      quiz: null,
       prompt: null,
       showClear: false,
       celebrateAt: 0,
@@ -183,10 +187,14 @@ export const useGame = create((set, get) => ({
       while (get().pending.length && get().sessionId) {
         const questId = get().pending[0];
         try {
-          const r = await api.complete(get().sessionId, questId);
-          set((s) => ({ online: true, serverScore: r.score, pending: s.pending.slice(1) }));
+          const r = questId === 'quiz'
+            ? await api.finalQuiz(get().sessionId, FINAL_QUIZ_KEY)
+            : await api.complete(get().sessionId, questId);
+          set((s) => ({ online: true, serverScore: r.score ?? s.serverScore, pending: s.pending.slice(1) }));
+          if (questId === 'quiz' && r.passed === false) continue; // 정답 키가 다름(버전 차이) — 조용히 버림
           if (r.added) sfx.play('coin');
-          if (r.added) get().toast(`🏫 ${get().profile?.school?.name} +${r.added}점!`);
+          if (r.added) get().toast(`🏫 ${get().profile?.school?.name} +${r.added}점!${questId === 'quiz' ? ' (보너스 퀴즈)' : ''}`);
+          else if (questId === 'quiz') get().toast('🏆 보너스 점수는 처음 맞혔을 때 이미 받았어요');
           if (r.clearTimeMs) set({ clearInfo: { timeMs: r.clearTimeMs, speedRank: r.speedRank } });
           get().refreshLeaderboard();
         } catch (err) {
@@ -218,6 +226,20 @@ export const useGame = create((set, get) => ({
     } catch {
       set({ online: false });
     }
+  },
+
+  // ── 퀴즈 ──
+  openQuiz: (quiz) => set({ quiz, prompt: null }),
+  closeQuiz: () => set({ quiz: null }),
+  // 최종 보너스 퀴즈 통과: 한 사람 1번만 서버가 +20 (다시하기 후 재통과는 +0)
+  passFinalQuiz: () => {
+    const { progress } = get();
+    if (progress.flags.quiz_passed) return;
+    set((s) => ({
+      progress: { ...s.progress, flags: { ...s.progress.flags, quiz_passed: true } },
+      pending: [...s.pending, 'quiz'],
+    }));
+    get().flushPending();
   },
 
   // ── UI ──
@@ -266,7 +288,7 @@ export const useGame = create((set, get) => ({
 }));
 
 function sortQuests(ids) {
-  const order = [...MAIN_QUESTS, 'final'];
+  const order = [...MAIN_QUESTS, 'final', 'quiz'];
   return [...ids].sort((a, b) => order.indexOf(a) - order.indexOf(b));
 }
 

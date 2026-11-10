@@ -108,6 +108,13 @@ const SOUNDS = {
     tone(note(4), { dur: 0.1, type: 'triangle', vol: 0.25 });
     tone(note(9), { at: 0.08, dur: 0.22, type: 'triangle', vol: 0.25 });
   },
+  // 퀴즈 정답 (딩동댕)
+  correct: () => [0, 4, 7].forEach((s, i) => tone(note(s + 12), { at: i * 0.11, dur: 0.22, type: 'triangle', vol: 0.24 })),
+  // 퀴즈 오답 (삐빅)
+  wrong: () => {
+    tone(220, { dur: 0.16, type: 'square', vol: 0.08 });
+    tone(196, { at: 0.17, dur: 0.26, type: 'square', vol: 0.08 });
+  },
   // 아직 조건이 안 됨 (음~)
   hint: () => tone(330, { dur: 0.22, type: 'triangle', vol: 0.18, to: 260 }),
   // 퀘스트 완료 팡파레

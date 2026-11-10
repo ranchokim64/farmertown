@@ -12,6 +12,7 @@ import { SoundToggles } from './ui/SoundToggles.jsx';
 import { useQuality, QUALITY } from './quality.js';
 import { QrOverlay } from './ui/QrOverlay.jsx';
 import { LearnNote } from './ui/LearnNote.jsx';
+import { Quiz } from './ui/Quiz.jsx';
 
 export default function App() {
   const phase = useGame((s) => s.phase);
@@ -57,6 +58,7 @@ export default function App() {
       )}
       {phase === 'play' && <HUD />}
       {showClear && <ClearScreen />}
+      {phase === 'play' && <Quiz />}
       <LearnNote />
       <QrOverlay />
     </div>
