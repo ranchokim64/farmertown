@@ -308,3 +308,7 @@ b.key { color: #c4570f; background: linear-gradient(transparent 62%, #ffe08a 62%
   .modal .quiz-q { font-size: 20px; margin: 12px 4px; }
   .choice-btn { font-size: 18px; padding: 11px 14px; }
 }
+.quest-tools { flex-wrap: wrap; }
+.quest-tools button { white-space: nowrap; flex: 1 1 auto; }
+.quest-tools button.ghost, .quest-tools button.record-btn { flex: 1 0 auto; }
+.modal.clear { position: relative; }

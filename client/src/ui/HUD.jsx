@@ -15,6 +15,8 @@ function QuestLog() {
   useEffect(() => {
     if (tutorial === 'mission' || tutorial === 'done') setOpen(true);
   }, [tutorial]);
+  // 한 번이라도 클리어했으면(처음부터 다시 하는 중에도) 기록 다시 보기 버튼
+  const hasRecord = useGame((s) => !!s.clearInfo?.timeMs || s.progress.completed.includes('final'));
   const doneCount = QUESTS.filter((q) => progress.completed.includes(q.id)).length;
   return (
     <div className={`panel quest-log ${tutorial === 'mission' ? 'spotlight' : ''}`}>
@@ -24,6 +26,11 @@ function QuestLog() {
       {tutorial === 'done' && (
         <div className="quest-tools">
           <button onClick={useLearnNote.getState().show}>📒 배움 노트</button>
+          {hasRecord && (
+            <button className="record-btn" onClick={useGame.getState().openRecord}>
+              🏆 내 기록
+            </button>
+          )}
           <button className="ghost" onClick={confirmRestart}>
             ↺ 처음부터
           </button>

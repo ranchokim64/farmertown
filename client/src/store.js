@@ -285,6 +285,8 @@ export const useGame = create((set, get) => ({
   },
   setPrompt: (prompt) => get().prompt !== prompt && set({ prompt }),
   closeClear: () => set({ showClear: false }),
+  // 🏆 내 기록: 클리어 화면(스피드런·학교 순위)을 다시 열기
+  openRecord: () => set({ showClear: 'review', dialog: null }),
 }));
 
 function sortQuests(ids) {

@@ -10,9 +10,13 @@ export function formatTime(ms) {
 }
 
 export function ClearScreen() {
-  const { clearInfo, leaderboard, profile, closeClear, refreshLeaderboard } = useGame();
+  const { clearInfo, leaderboard, profile, closeClear, refreshLeaderboard, serverScore } = useGame();
+  const review = useGame((s) => s.showClear === 'review');
+  const cleared = useGame((s) => s.progress.completed.includes('final'));
   const replay = useGame((s) => (s.progress.replays ?? 0) > 0);
   const quizPassed = useGame((s) => !!s.progress.flags.quiz_passed);
+  // 다시 보기 때는 클리어 순간의 순위가 없을 수 있어 TOP 5 목록에서 내 이름을 찾음
+  const speedRank = clearInfo?.speedRank ?? (leaderboard?.speedrun ?? []).find((r) => r.nickname === profile?.nickname && r.schoolName === profile?.school?.name)?.rank;
   useEffect(() => {
     refreshLeaderboard();
   }, [refreshLeaderboard]);
@@ -20,8 +24,18 @@ export function ClearScreen() {
   return (
     <div className="modal-bg">
       <div className="modal clear">
-        <div className="badge">🎆 게임 클리어 🎆</div>
-        <h2>황금 들판 감사 트리 완성!</h2>
+        {review && (
+          <button className="note-x quiz-x" onClick={closeClear} aria-label="닫기">
+            ✕
+          </button>
+        )}
+        <div className="badge">{review ? '🏆 나의 기록 🏆' : '🎆 게임 클리어 🎆'}</div>
+        <h2>{review ? `${profile?.nickname} 농부님의 기록` : '황금 들판 감사 트리 완성!'}</h2>
+        {review ? (
+          <p>
+            우리 학교에 보탠 점수 <b>{serverScore ?? 0}점</b>
+          </p>
+        ) : (
         <p>
           <b>{profile?.nickname}</b> 농부님, 수고했어요! <br />
           {replay ? '다시 하기도 완료! (학교 점수는 처음 깼을 때 이미 더해졌어요)' : (
@@ -30,9 +44,10 @@ export function ClearScreen() {
             </>
           )}
         </p>
+        )}
         <div className="record">
           ⏱ 클리어 기록 <b>{formatTime(clearInfo?.timeMs)}</b>
-          {clearInfo?.speedRank && <span> · 명예의 전당 {clearInfo.speedRank}위</span>}
+          {speedRank && <span> · 명예의 전당 {speedRank}위</span>}
         </div>
 
         <div className="boards">
@@ -65,7 +80,7 @@ export function ClearScreen() {
           </div>
         </div>
         <p className="muted">농업인 여러분, 맛있는 쌀을 길러 주셔서 고맙습니다! 🍚</p>
-        {!quizPassed && (
+        {!quizPassed && cleared && (
           <button className="btn primary big quiz-cta" onClick={() => { closeClear(); useGame.getState().openQuiz({ kind: 'final' }); }}>
             🏆 보너스 퀴즈 도전! (5문제 모두 맞히면 +20점)
           </button>
