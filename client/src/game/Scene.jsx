@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useGame } from '../store.js';
+import { useGame, backoffMs } from '../store.js';
 import { MAIN_QUESTS, questActive, questStarted } from './data/quests.js';
 import { PLACES, WEEDY_PADDIES } from './data/world.js';
 import { player } from './runtime.js';
@@ -80,13 +80,36 @@ function QualityMonitor() {
   return null;
 }
 
+// 전광판 순위: 45초마다 (화면이 안 보이면 멈춤, 실패하면 간격을 늘림)
+// 10초 폴링은 접속자 수에 비례해 서버를 두드려 2026-11-11 장애를 키웠음.
+const POLL_MS = 45_000;
 function LeaderboardPoller() {
-  const refresh = useGame((s) => s.refreshLeaderboard);
   useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, 10_000);
-    return () => clearInterval(id);
-  }, [refresh]);
+    let timer = null;
+    let fails = 0;
+    let last = 0;
+    const schedule = (ms) => {
+      clearTimeout(timer);
+      timer = setTimeout(tick, ms);
+    };
+    const tick = async () => {
+      if (document.hidden) return; // 다시 보일 때 visibilitychange 에서 이어감
+      last = Date.now();
+      const ok = await useGame.getState().refreshLeaderboard();
+      fails = ok ? 0 : fails + 1;
+      schedule(ok ? POLL_MS * (0.9 + Math.random() * 0.2) : backoffMs(fails, POLL_MS));
+    };
+    const onVisible = () => {
+      if (document.hidden) return clearTimeout(timer);
+      schedule(Date.now() - last > POLL_MS ? Math.random() * 3000 : POLL_MS - (Date.now() - last));
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    schedule(Math.random() * 2000); // 동시에 켠 태블릿들이 한꺼번에 묻지 않도록
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
   return null;
 }
 

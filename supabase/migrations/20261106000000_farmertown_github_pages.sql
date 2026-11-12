@@ -172,6 +172,8 @@ insert into ft_config (key, value) values
   ('rl_ip_per_min', '1200'),            -- IP 당 분당 API 호출 (학교는 IP 하나를 공유하므로 넉넉하게)
   ('rl_session_create_per_min', '120'), -- IP 당 분당 세션 생성
   ('rl_session_per_min', '60'),         -- 세션 당 분당 호출
+  ('neis_timeout_ms', '1500'),          -- NEIS 응답 대기 한도 (Supabase anon 의 3초 시간 제한보다 충분히 짧게)
+  ('leaderboard_cache_ms', '5000'),     -- 순위 결과 공유 캐시 (수백 명이 같은 결과를 함께 씀)
   ('neis_api_key', '')                  -- 나이스 교육정보 개방 포털 인증키 (선택)
 on conflict (key) do nothing;
 
@@ -214,6 +216,18 @@ begin
 end $$;
 
 -- 비속어 필터: 공백·숫자·기호를 지운 뒤 검사 ("시 1 발", "씨.발", "ㅅㅂ" 우회 차단)
+-- 잠그지 않고 읽기만 하는 Rate Limit 확인 (넘었으면 429, 아니면 null)
+-- 오래 걸리는 작업(외부 API) 전에는 이것으로 확인하고, 기록(ft_limited)은 작업이 끝난 뒤 짧게 함.
+-- 이유: ft_limited 는 학교 IP 행을 고치고 함수가 끝날 때까지 잠가 두므로, 그 상태로 외부 API 를 기다리면
+--       같은 학교의 모든 요청이 줄을 서다 3초 시간 제한으로 취소됨 (2026-11-11 장애 원인)
+create or replace function ft_over_limit(p_key text, p_limit int) returns jsonb
+language sql stable as $$
+  select ft_err(429, 'RATE_LIMITED', '조금만 천천히! 잠시 후 다시 시도해 주세요.',
+                greatest(0, (extract(epoch from (reset_at - now())) * 1000)::int))
+  from ft_rate_limits
+  where key = 'rl:' || p_key and reset_at > now() and count >= p_limit
+$$;
+
 create or replace function ft_has_profanity(p_text text) returns boolean
 language sql immutable as $$
   select exists (
@@ -279,18 +293,22 @@ declare
   v_rows jsonb;
   v_key text;
 begin
-  v_lim := ft_limited('ip:' || ft_client_ip(), ft_cfg_int('rl_ip_per_min', 1200));
-  if v_lim is not null then return v_lim; end if;
   if v_q = '' then
     return jsonb_build_object('source', 'none', 'schools', '[]'::jsonb);
   end if;
 
+  -- 캐시에 있으면 쓰기 없이 바로 응답
   select value into v_res from ft_cache where key = 'schoolq:' || v_q and expires_at > now();
   if v_res is not null then return v_res; end if;
 
+  -- 제한은 '읽기만' 확인 (아무 행도 잠그지 않은 채로 NEIS 를 기다리기 위해)
+  v_lim := ft_over_limit('ip:' || ft_client_ip(), ft_cfg_int('rl_ip_per_min', 1200));
+  if v_lim is not null then return v_lim; end if;
+
   begin
     v_key := coalesce(ft_cfg('neis_api_key'), '');
-    perform http_set_curlopt('CURLOPT_TIMEOUT_MS', '3000');
+    perform http_set_curlopt('CURLOPT_TIMEOUT_MS', ft_cfg_int('neis_timeout_ms', 1500)::text);
+    perform http_set_curlopt('CURLOPT_CONNECTTIMEOUT_MS', ft_cfg_int('neis_timeout_ms', 1500)::text);
     select content::jsonb into v_body from http_get(
       'https://open.neis.go.kr/hub/schoolInfo?Type=json&pIndex=1&pSize=15'
       || '&SCHUL_KND_SC_NM=' || urlencode('초등학교')
@@ -320,7 +338,12 @@ begin
     v_res := jsonb_build_object('source', 'sample', 'schools', coalesce((
       select jsonb_agg(s) from jsonb_array_elements(ft_sample_schools()) s where position(v_q in s ->> 'name') > 0
     ), '[]'::jsonb));
+    -- NEIS 가 느리거나 안 될 때 같은 검색어로 계속 기다리지 않도록 1분만 기억
+    insert into ft_cache (key, value, expires_at) values ('schoolq:' || v_q, v_res, now() + interval '1 minute')
+    on conflict (key) do update set value = excluded.value, expires_at = excluded.expires_at;
   end;
+  -- 호출 횟수 기록은 맨 끝에 (행 잠금이 커밋 직전 아주 잠깐만 유지됨)
+  perform ft_limited('ip:' || ft_client_ip(), ft_cfg_int('rl_ip_per_min', 1200));
   return v_res;
 end $$;
 
@@ -510,9 +533,10 @@ declare
   v_my jsonb;
   v_score int;
   v_rank int;
+  v_top jsonb;
 begin
-  v_lim := ft_limited('ip:' || ft_client_ip(), ft_cfg_int('rl_ip_per_min', 1200));
-  if v_lim is not null then return v_lim; end if;
+  -- 읽기 전용 API: 학교 IP 행에 쓰기(Rate Limit 기록)를 하지 않음 → 같은 학교 요청끼리 줄 서지 않음.
+  -- 대신 학교/스피드런 TOP 목록은 몇 초간 모두가 같은 결과(ft_cache)를 함께 씀.
 
   if p_school ~ '^([A-Z][0-9]{2}:[0-9]{7}|demo:[a-z]+|custom:[가-힣a-zA-Z0-9]{2,20})$' then
     select score::int into v_score from ft_schools where code = p_school;
@@ -524,7 +548,9 @@ begin
     v_my := jsonb_build_object('code', p_school, 'rank', v_rank, 'score', v_score);
   end if;
 
-  return jsonb_build_object(
+  select value into v_top from ft_cache where key = 'lb:top:' || v_limit and expires_at > now();
+  if v_top is null then
+  v_top := jsonb_build_object(
     'schools', coalesce((
       select jsonb_agg(jsonb_build_object('rank', t.rn, 'code', t.code, 'name', t.name, 'score', t.score) order by t.rn)
       from (
@@ -539,9 +565,21 @@ begin
         from ft_sessions where clear_time_ms is not null order by clear_time_ms, started_at limit 10
       ) t
     ), '[]'::jsonb),
-    'mySchool', v_my,
     'updatedAt', (extract(epoch from now()) * 1000)::bigint
   );
+    -- 동시에 여러 명이 캐시를 채우려 해도 기다리지 않음 (이미 누가 고치는 중이면 건너뜀)
+    begin
+      perform set_config('lock_timeout', '200ms', true);
+      insert into ft_cache as c (key, value, expires_at)
+      values ('lb:top:' || v_limit, v_top, now() + make_interval(secs => ft_cfg_int('leaderboard_cache_ms', 5000) / 1000.0))
+      on conflict (key) do update set value = excluded.value, expires_at = excluded.expires_at
+        where c.expires_at <= now();
+      perform set_config('lock_timeout', '0', true);
+    exception when lock_not_available then
+      perform set_config('lock_timeout', '0', true);
+    end;
+  end if;
+  return v_top || jsonb_build_object('mySchool', v_my);
 end $$;
 
 -- ── 권한 ──────────────────────────────────────────────
@@ -549,7 +587,7 @@ end $$;
 revoke all on ft_sessions, ft_session_quests, ft_schools, ft_rate_limits, ft_cache, ft_config from public;
 revoke execute on function
   ft_rate_hit(text, int, int), ft_cooldown(text, int), ft_complete_quest(uuid, text, int, boolean),
-  ft_cfg(text), ft_cfg_int(text, int), ft_client_ip(), ft_err(int, text, text, int), ft_limited(text, int, int),
+  ft_cfg(text), ft_cfg_int(text, int), ft_client_ip(), ft_err(int, text, text, int), ft_limited(text, int, int), ft_over_limit(text, int),
   ft_has_profanity(text), ft_sample_schools(), ft_session_json(uuid),
   ft_api_search_schools(text), ft_api_create_session(text, text, text, text), ft_api_get_session(text),
   ft_api_complete(text, text), ft_api_final_quiz(text, text), ft_api_leaderboard(int, text)
@@ -561,7 +599,7 @@ begin
     revoke all on ft_sessions, ft_session_quests, ft_schools, ft_rate_limits, ft_cache, ft_config from anon, authenticated;
     revoke execute on function
       ft_rate_hit(text, int, int), ft_cooldown(text, int), ft_complete_quest(uuid, text, int, boolean),
-      ft_cfg(text), ft_cfg_int(text, int), ft_client_ip(), ft_err(int, text, text, int), ft_limited(text, int, int),
+      ft_cfg(text), ft_cfg_int(text, int), ft_client_ip(), ft_err(int, text, text, int), ft_limited(text, int, int), ft_over_limit(text, int),
       ft_has_profanity(text), ft_sample_schools(), ft_session_json(uuid)
     from anon, authenticated;
     grant execute on function

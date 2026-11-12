@@ -27,3 +27,4 @@ for f in migrations/*.sql; do
   done
 done
 psql "$DB" -qX -v ON_ERROR_STOP=1 -f tests/api_test.sql
+bash tests/lock_test.sh "$DB"

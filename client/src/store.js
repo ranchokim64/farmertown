@@ -179,6 +179,7 @@ export const useGame = create((set, get) => ({
 
   // 서버 전송 큐: 순서대로 하나씩 보내고, 쿨타임(429)이면 기다렸다가 재시도
   _flushing: false,
+  _fails: 0, // 연속 실패 횟수 → 재시도 간격을 점점 늘림
   flushPending: async () => {
     if (get()._flushing) return;
     set({ _flushing: true });
@@ -190,7 +191,7 @@ export const useGame = create((set, get) => ({
           const r = questId === 'quiz'
             ? await api.finalQuiz(get().sessionId, FINAL_QUIZ_KEY)
             : await api.complete(get().sessionId, questId);
-          set((s) => ({ online: true, serverScore: r.score ?? s.serverScore, pending: s.pending.slice(1) }));
+          set((s) => ({ online: true, serverScore: r.score ?? s.serverScore, pending: s.pending.slice(1), _fails: 0 }));
           if (questId === 'quiz' && r.passed === false) continue; // 정답 키가 다름(버전 차이) — 조용히 버림
           if (r.added) sfx.play('coin');
           if (r.added) get().toast(`🏫 ${get().profile?.school?.name} +${r.added}점!${questId === 'quiz' ? ' (보너스 퀴즈)' : ''}`);
@@ -199,7 +200,7 @@ export const useGame = create((set, get) => ({
           get().refreshLeaderboard();
         } catch (err) {
           if (err instanceof ApiError && err.status === 429) {
-            retryMs = err.body?.retryAfterMs ?? 3000;
+            retryMs = (err.body?.retryAfterMs ?? 3000) + Math.random() * 2000;
           } else if (err instanceof ApiError && err.status === 404) {
             await get().reRegister();
             retryMs = 1000;
@@ -207,8 +208,10 @@ export const useGame = create((set, get) => ({
             set((s) => ({ pending: s.pending.slice(1) })); // 복구 불가 요청은 버림
             continue;
           } else {
-            set({ online: false });
-            retryMs = 8000;
+            // 서버 장애: 8초 → 16초 → 32초 … 최대 5분, 무작위로 흩어서 (모두가 동시에 다시 몰리지 않게)
+            const fails = get()._fails + 1;
+            set({ online: false, _fails: fails });
+            retryMs = backoffMs(fails);
           }
           break;
         }
@@ -219,12 +222,15 @@ export const useGame = create((set, get) => ({
     if (retryMs) setTimeout(() => get().flushPending(), retryMs + 200);
   },
 
+  // 성공하면 true (전광판 폴링이 실패 시 간격을 늘리는 데 씀)
   refreshLeaderboard: async () => {
     try {
       const lb = await api.leaderboard(get().profile?.school?.code);
       set({ leaderboard: lb, online: true });
+      return true;
     } catch {
       set({ online: false });
+      return false;
     }
   },
 
@@ -288,6 +294,12 @@ export const useGame = create((set, get) => ({
   // 🏆 내 기록: 클리어 화면(스피드런·학교 순위)을 다시 열기
   openRecord: () => set({ showClear: 'review', dialog: null }),
 }));
+
+// 지수 백오프 + 무작위 흩뿌리기: n번째 연속 실패 → 대략 8초 × 2^(n-1), 최대 5분
+export function backoffMs(n, base = 8000, max = 300_000) {
+  const ms = Math.min(max, base * 2 ** Math.max(0, n - 1));
+  return ms * (0.75 + Math.random() * 0.5);
+}
 
 function sortQuests(ids) {
   const order = [...MAIN_QUESTS, 'final', 'quiz'];

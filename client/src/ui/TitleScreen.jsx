@@ -32,7 +32,7 @@ function SchoolSearch({ value, onChange }) {
       } catch {
         if (alive) setRes({ q, schools: [], failed: true });
       }
-    }, 250);
+    }, 400); // 한글은 자모를 칠 때마다 바뀌므로 조금 더 기다렸다 검색
     return () => {
       alive = false;
       clearTimeout(timer);
